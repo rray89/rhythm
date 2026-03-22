@@ -11,10 +11,12 @@ Rhythm 是一个 macOS 节奏提醒工具，帮助用户建立稳定的「专注
 ## V1 功能
 
 - 自定义节奏：可设置专注间隔（10-120 分钟，5 分钟步进）和休息时长（30 秒-10 分钟，常用档位）
+- 不休息模式：可开启“不休息”，到点自动跳过并记录本次应休息会话
 - 锁屏重置：检测到系统锁屏后重置当前计时周期
 - 休息遮罩：到点展示全屏半透明遮罩，支持 `ESC` 跳过
 - 数据记录：保存每次休息的计划时长、实际时长、是否跳过
 - 菜单栏应用：常驻状态栏，快速查看状态与最近记录
+- 开机启动：支持在菜单中开启/关闭登录时启动（打包安装后可用）
 
 ## 技术栈
 
@@ -71,6 +73,7 @@ RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
 ├── Sources/
 │   ├── RhythmApp/
 │   │   ├── AppModel.swift
+│   │   ├── LaunchAtLoginManager.swift
 │   │   ├── LockMonitor.swift
 │   │   ├── MenuBarView.swift
 │   │   ├── OverlayManager.swift

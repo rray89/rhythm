@@ -129,6 +129,23 @@ public final class TimerEngine: ObservableObject {
     }
 
     private func beginResting() {
+        if settingsStore.skipRestEnabled {
+            let now = nowProvider()
+            let session = RestSession(
+                scheduledRestSeconds: settingsStore.restSeconds,
+                actualRestSeconds: 0,
+                startedAt: now,
+                endedAt: now,
+                skipped: true,
+                skipReason: "no_rest"
+            )
+            sessionStore.add(session)
+            cycleStartedAt = now
+            mode = .focusing
+            secondsUntilBreak = settingsStore.focusSeconds
+            return
+        }
+
         mode = .resting
         restStartedAt = nowProvider()
         overlayManager.present(restSeconds: settingsStore.restSeconds)

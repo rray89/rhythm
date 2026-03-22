@@ -10,7 +10,8 @@ struct RhythmApp: App {
             MenuBarView(
                 timerEngine: appModel.timerEngine,
                 settingsStore: appModel.settingsStore,
-                sessionStore: appModel.sessionStore
+                sessionStore: appModel.sessionStore,
+                launchAtLoginManager: appModel.launchAtLoginManager
             )
         } label: {
             RhythmMenuBarLabel()

@@ -4,6 +4,7 @@
 # SwiftPM
 .build/
 Package.resolved
+dist/
 
 # Xcode
 DerivedData/

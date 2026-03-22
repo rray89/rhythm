@@ -8,16 +8,19 @@ final class AppModel: ObservableObject {
     let sessionStore: SessionStore
     let timerEngine: TimerEngine
     let overlayManager: OverlayManager
+    let launchAtLoginManager: LaunchAtLoginManager
 
     init() {
         let settingsStore = SettingsStore()
         let sessionStore = SessionStore()
         let overlayManager = OverlayManager()
         let lockMonitor = LockMonitor()
+        let launchAtLoginManager = LaunchAtLoginManager()
 
         self.settingsStore = settingsStore
         self.sessionStore = sessionStore
         self.overlayManager = overlayManager
+        self.launchAtLoginManager = launchAtLoginManager
         self.timerEngine = TimerEngine(
             settingsStore: settingsStore,
             sessionStore: sessionStore,

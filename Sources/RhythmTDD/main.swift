@@ -17,10 +17,19 @@ struct RhythmTDDRunner {
             store.onDidChange = {
                 callbackCount += 1
             }
-            store.focusMinutes = 30
+            store.focusMinutes = 35
 
-            guard store.focusMinutes == 30 else { return false }
+            guard store.focusMinutes == 35 else { return false }
             return callbackCount == 1
+        }
+
+        failures += run("default settings are 30m focus and 1m rest") {
+            let isolated = makeIsolatedDefaults()
+            defer { isolated.defaults.removePersistentDomain(forName: isolated.suiteName) }
+
+            let store = SettingsStore(userDefaults: isolated.defaults)
+            guard store.focusMinutes == 30 else { return false }
+            return store.restSeconds == 60
         }
 
         failures += run("settings normalization keeps configured range and rest presets") {
@@ -86,6 +95,37 @@ struct RhythmTDDRunner {
             guard sessions.captured[0].actualRestSeconds == 2 else { return false }
             guard sessions.captured[0].skipped else { return false }
             return sessions.captured[0].skipReason == "esc"
+        }
+
+        failures += run("no-rest mode records auto skipped session") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_500))
+            let settings = FakeSettings(focusSeconds: 12, restSeconds: 90, skipRestEnabled: true)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(12)
+            engine.processTick(now: clock.now)
+
+            guard engine.mode == .focusing else { return false }
+            guard engine.secondsUntilBreak == 12 else { return false }
+            guard overlay.lastPresentedRestSeconds == nil else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].skipped else { return false }
+            guard sessions.captured[0].skipReason == "no_rest" else { return false }
+            guard sessions.captured[0].scheduledRestSeconds == 90 else { return false }
+            return sessions.captured[0].actualRestSeconds == 0
         }
 
         failures += run("screen lock resets cycle") {
@@ -257,11 +297,13 @@ private func runProcess(
 private final class FakeSettings: RhythmSettings {
     var focusSeconds: Int
     var restSeconds: Int
+    var skipRestEnabled: Bool
     var onDidChange: (() -> Void)?
 
-    init(focusSeconds: Int, restSeconds: Int) {
+    init(focusSeconds: Int, restSeconds: Int, skipRestEnabled: Bool = false) {
         self.focusSeconds = focusSeconds
         self.restSeconds = restSeconds
+        self.skipRestEnabled = skipRestEnabled
     }
 }
 

@@ -88,6 +88,7 @@ extension SessionStore: RestSessionStoring {}
 public protocol RhythmSettings: AnyObject {
     var focusSeconds: Int { get }
     var restSeconds: Int { get }
+    var skipRestEnabled: Bool { get }
     var onDidChange: (() -> Void)? { get set }
 }
 
@@ -96,6 +97,7 @@ public final class SettingsStore: ObservableObject {
     public static let focusMinutesKey = "focusMinutes"
     public static let restSecondsKey = "restSeconds"
     public static let legacyRestMinutesKey = "restMinutes"
+    public static let skipRestEnabledKey = "skipRestEnabled"
 
     public static let minFocusMinutes = 10
     public static let maxFocusMinutes = 120
@@ -135,6 +137,16 @@ public final class SettingsStore: ObservableObject {
         }
     }
 
+    @Published public var skipRestEnabled: Bool {
+        didSet {
+            if oldValue == skipRestEnabled {
+                return
+            }
+            userDefaults.set(skipRestEnabled, forKey: Self.skipRestEnabledKey)
+            onDidChange?()
+        }
+    }
+
     public var onDidChange: (() -> Void)?
 
     public var focusSeconds: Int { focusMinutes * 60 }
@@ -144,14 +156,20 @@ public final class SettingsStore: ObservableObject {
     public init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
         let storedFocus = userDefaults.object(forKey: Self.focusMinutesKey) as? Int
-        self.focusMinutes = Self.normalizeFocusMinutes(storedFocus ?? 25)
+        self.focusMinutes = Self.normalizeFocusMinutes(storedFocus ?? 30)
 
         if let storedRestSeconds = userDefaults.object(forKey: Self.restSecondsKey) as? Int {
             self.restSeconds = Self.normalizeRestSeconds(storedRestSeconds)
         } else if let storedLegacyRestMinutes = userDefaults.object(forKey: Self.legacyRestMinutesKey) as? Int {
             self.restSeconds = Self.normalizeRestSeconds(storedLegacyRestMinutes * 60)
         } else {
-            self.restSeconds = Self.normalizeRestSeconds(5 * 60)
+            self.restSeconds = Self.normalizeRestSeconds(60)
+        }
+
+        if let storedSkipRestEnabled = userDefaults.object(forKey: Self.skipRestEnabledKey) as? Bool {
+            self.skipRestEnabled = storedSkipRestEnabled
+        } else {
+            self.skipRestEnabled = false
         }
     }
 
