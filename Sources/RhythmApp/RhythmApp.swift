@@ -7,7 +7,11 @@ struct RhythmApp: App {
 
     var body: some Scene {
         MenuBarExtra("Rhythm", systemImage: "metronome") {
-            MenuBarView(appModel: appModel)
+            MenuBarView(
+                timerEngine: appModel.timerEngine,
+                settingsStore: appModel.settingsStore,
+                sessionStore: appModel.sessionStore
+            )
         }
         .menuBarExtraStyle(.window)
     }

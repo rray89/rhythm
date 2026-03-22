@@ -3,7 +3,9 @@ import RhythmCore
 import SwiftUI
 
 struct MenuBarView: View {
-    @ObservedObject var appModel: AppModel
+    @ObservedObject var timerEngine: TimerEngine
+    @ObservedObject var settingsStore: SettingsStore
+    @ObservedObject var sessionStore: SessionStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -21,11 +23,11 @@ struct MenuBarView: View {
 
     private var statusSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(appModel.timerEngine.mode == .focusing ? "当前状态：专注中" : "当前状态：休息中")
+            Text(timerEngine.mode == .focusing ? "当前状态：专注中" : "当前状态：休息中")
                 .font(.headline)
 
-            if appModel.timerEngine.mode == .focusing {
-                Text("距离休息还有 \(formatDuration(appModel.timerEngine.secondsUntilBreak))")
+            if timerEngine.mode == .focusing {
+                Text("距离休息还有 \(formatDuration(timerEngine.secondsUntilBreak))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
@@ -46,12 +48,12 @@ struct MenuBarView: View {
                 Spacer()
                 Stepper(
                     value: Binding(
-                        get: { appModel.settingsStore.focusMinutes },
-                        set: { appModel.settingsStore.focusMinutes = $0 }
+                        get: { settingsStore.focusMinutes },
+                        set: { settingsStore.focusMinutes = $0 }
                     ),
                     in: 1 ... 240
                 ) {
-                    Text("\(appModel.settingsStore.focusMinutes) 分钟")
+                    Text("\(settingsStore.focusMinutes) 分钟")
                         .frame(width: 100, alignment: .trailing)
                 }
                 .frame(width: 180)
@@ -62,12 +64,12 @@ struct MenuBarView: View {
                 Spacer()
                 Stepper(
                     value: Binding(
-                        get: { appModel.settingsStore.restMinutes },
-                        set: { appModel.settingsStore.restMinutes = $0 }
+                        get: { settingsStore.restMinutes },
+                        set: { settingsStore.restMinutes = $0 }
                     ),
                     in: 1 ... 90
                 ) {
-                    Text("\(appModel.settingsStore.restMinutes) 分钟")
+                    Text("\(settingsStore.restMinutes) 分钟")
                         .frame(width: 100, alignment: .trailing)
                 }
                 .frame(width: 180)
@@ -81,17 +83,17 @@ struct MenuBarView: View {
                 Text("最近记录")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                Text("\(appModel.sessionStore.sessions.count) 次")
+                Text("\(sessionStore.sessions.count) 次")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            if appModel.sessionStore.sessions.isEmpty {
+            if sessionStore.sessions.isEmpty {
                 Text("暂无记录")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(appModel.sessionStore.sessions.prefix(5)) { session in
+                ForEach(sessionStore.sessions.prefix(5)) { session in
                     HStack {
                         Text(timeLabel(session.startedAt))
                             .font(.caption)
@@ -112,18 +114,18 @@ struct MenuBarView: View {
 
     private var actionSection: some View {
         HStack {
-            if appModel.timerEngine.mode == .focusing {
+            if timerEngine.mode == .focusing {
                 Button("立即休息") {
-                    appModel.timerEngine.startBreakNow()
+                    timerEngine.startBreakNow()
                 }
             } else {
                 Button("跳过本次休息") {
-                    appModel.timerEngine.skipBreak()
+                    timerEngine.skipBreak()
                 }
             }
 
             Button("重置计时") {
-                appModel.timerEngine.resetCycle()
+                timerEngine.resetCycle()
             }
 
             Spacer()

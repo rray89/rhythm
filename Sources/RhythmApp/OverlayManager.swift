@@ -12,6 +12,7 @@ final class OverlayManager: ObservableObject {
 
     private var overlayWindow: NSWindow?
     private var keyMonitor: Any?
+    private var globalKeyMonitor: Any?
     private var countdownTimer: Timer?
     private var restEndAt: Date?
 
@@ -40,12 +41,19 @@ final class OverlayManager: ObservableObject {
         window.hasShadow = false
         window.ignoresMouseEvents = false
         window.contentView = NSHostingView(rootView: contentView)
+        window.onEscape = { [weak self] in
+            self?.skipByEscape()
+        }
 
         overlayWindow = window
         isShowing = true
 
+        NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps, .activateAllWindows])
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        window.makeMain()
+        window.makeFirstResponder(window.contentView)
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
@@ -54,6 +62,12 @@ final class OverlayManager: ObservableObject {
                 return nil
             }
             return event
+        }
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return }
+            Task { @MainActor [weak self] in
+                self?.skipByEscape()
+            }
         }
 
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -73,6 +87,10 @@ final class OverlayManager: ObservableObject {
             NSEvent.removeMonitor(keyMonitor)
         }
         keyMonitor = nil
+        if let globalKeyMonitor {
+            NSEvent.removeMonitor(globalKeyMonitor)
+        }
+        globalKeyMonitor = nil
 
         overlayWindow?.orderOut(nil)
         overlayWindow = nil
@@ -135,8 +153,18 @@ private struct OverlayView: View {
 }
 
 private final class OverlayWindow: NSWindow {
+    var onEscape: (() -> Void)?
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 {
+            onEscape?()
+            return
+        }
+        super.keyDown(with: event)
+    }
 }
 
 extension OverlayManager: RestOverlaying {}
