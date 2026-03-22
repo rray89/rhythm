@@ -12,9 +12,9 @@ final class OverlayManager: ObservableObject {
 
     private var overlayWindow: NSWindow?
     private var keyMonitor: Any?
-    private var globalKeyMonitor: Any?
     private var countdownTimer: Timer?
     private var restEndAt: Date?
+    private let escapeEventTap = EscapeEventTap()
 
     func present(restSeconds: Int) {
         dismiss()
@@ -55,18 +55,21 @@ final class OverlayManager: ObservableObject {
         window.makeMain()
         window.makeFirstResponder(window.contentView)
 
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return event }
-            if event.keyCode == 53 {
-                self.skipByEscape()
-                return nil
-            }
-            return event
+        escapeEventTap.onEscape = { [weak self] in
+            self?.skipByEscape()
         }
-        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.keyCode == 53 else { return }
-            Task { @MainActor [weak self] in
-                self?.skipByEscape()
+        // Global event tap can consume ESC even when focus drifts to another app (for example Terminal).
+        // macOS will prompt for accessibility permission when needed.
+        escapeEventTap.start(promptIfNeeded: true)
+
+        if !escapeEventTap.isEnabled {
+            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else { return event }
+                if event.keyCode == 53 {
+                    self.skipByEscape()
+                    return nil
+                }
+                return event
             }
         }
 
@@ -87,10 +90,8 @@ final class OverlayManager: ObservableObject {
             NSEvent.removeMonitor(keyMonitor)
         }
         keyMonitor = nil
-        if let globalKeyMonitor {
-            NSEvent.removeMonitor(globalKeyMonitor)
-        }
-        globalKeyMonitor = nil
+        escapeEventTap.stop()
+        escapeEventTap.onEscape = nil
 
         overlayWindow?.orderOut(nil)
         overlayWindow = nil
