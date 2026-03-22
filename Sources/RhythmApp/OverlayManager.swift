@@ -189,26 +189,44 @@ private struct OverlayView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.55)
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.86),
+                    Color.black.opacity(0.78)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
                 .ignoresSafeArea()
-            VStack(spacing: 16) {
+            VStack(spacing: 18) {
+                RhythmLogoMark(size: 62, detailed: true)
                 Text("休息时间")
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                 Text(Self.format(model.remainingSeconds))
-                    .font(.system(size: 64, weight: .heavy, design: .rounded))
+                    .font(.system(size: 74, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
                     .monospacedDigit()
                 Text("按 ESC 跳过本次休息")
-                    .font(.system(size: 20, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.92))
                 Button("跳过") {
                     skipAction()
                 }
                 .keyboardShortcut(.cancelAction)
                 .buttonStyle(.borderedProminent)
-                .tint(.white.opacity(0.2))
+                .tint(RhythmBrand.warning.opacity(0.84))
             }
+            .padding(.vertical, 34)
+            .padding(.horizontal, 40)
+            .background(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(Color.white.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    )
+            )
         }
     }
 

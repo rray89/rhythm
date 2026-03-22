@@ -1,0 +1,28 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(332 248) rotate(54.6) scale(842 842)">
+      <stop stop-color="#2ED7C3" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#112038"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="232" y1="232" x2="792" y2="792" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2ED7C3"/>
+      <stop offset="1" stop-color="#79B2FF"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="206" y1="512" x2="818" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9F7FF"/>
+      <stop offset="1" stop-color="#2ED7C3"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="224" fill="#0E1522"/>
+  <circle cx="512" cy="512" r="320" fill="url(#bgGlow)"/>
+  <circle cx="512" cy="512" r="280" stroke="url(#ring)" stroke-width="52"/>
+
+  <path
+    d="M218 512H370L450 336L530 680L612 430L698 512H806"
+    stroke="url(#pulse)"
+    stroke-width="58"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
