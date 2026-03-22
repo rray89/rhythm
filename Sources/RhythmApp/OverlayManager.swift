@@ -16,7 +16,7 @@ final class OverlayManager: ObservableObject {
     private var focusEnforcerTimer: Timer?
     private var restEndAt: Date?
     private var shownAt: Date?
-    private let debugOverlay = ProcessInfo.processInfo.environment["RHYTHM_SMOKE_OVERLAY"] == "1"
+    private let debugOverlay = ProcessInfo.processInfo.environment["RHYTHM_OVERLAY_DEBUG"] == "1"
     private var originalActivationPolicy: NSApplication.ActivationPolicy?
 
     func present(restSeconds: Int) {

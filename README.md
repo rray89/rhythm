@@ -36,6 +36,25 @@ swift run RhythmTDD
 - 设置变更回调与最小值归一化
 - 跳过休息后的 session 记录
 - 锁屏导致的计时周期重置
+- 休息遮罩可见性与焦点（自动 smoke）
+
+如需临时跳过 UI 集成 smoke：
+
+```bash
+RHYTHM_TDD_UI=0 swift run RhythmTDD
+```
+
+手动跑遮罩 smoke（默认仅输出 smoke 流程日志）：
+
+```bash
+RHYTHM_SMOKE_OVERLAY=1 swift run Rhythm
+```
+
+如需输出遮罩焦点细节日志，再加：
+
+```bash
+RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
+```
 
 ## 项目结构
 

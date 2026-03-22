@@ -6,6 +6,7 @@ import RhythmCore
 struct RhythmTDDRunner {
     static func main() {
         var failures = 0
+        let includeUI = ProcessInfo.processInfo.environment["RHYTHM_TDD_UI"] != "0"
 
         failures += run("settings change callback fires once") {
             let isolated = makeIsolatedDefaults()
@@ -95,6 +96,14 @@ struct RhythmTDDRunner {
             return overlay.dismissCallCount == 1
         }
 
+        if includeUI {
+            failures += run("overlay smoke is visible and focusable") {
+                runOverlayFocusSmokeCheck()
+            }
+        } else {
+            print("SKIP: overlay smoke check (RHYTHM_TDD_UI=0)")
+        }
+
         if failures == 0 {
             print("All TDD checks passed.")
             exit(0)
@@ -120,6 +129,107 @@ private func run(_ name: String, check: () -> Bool) -> Int {
 private func makeIsolatedDefaults() -> (defaults: UserDefaults, suiteName: String) {
     let suiteName = "RhythmTDD.\(UUID().uuidString)"
     return (UserDefaults(suiteName: suiteName)!, suiteName)
+}
+
+private func runOverlayFocusSmokeCheck() -> Bool {
+    let cwd = FileManager.default.currentDirectoryPath
+    let binaryCandidates = [
+        "\(cwd)/.build/arm64-apple-macosx/debug/Rhythm",
+        "\(cwd)/.build/x86_64-apple-macosx/debug/Rhythm"
+    ]
+    let binaryPath = binaryCandidates.first { FileManager.default.fileExists(atPath: $0) }
+
+    var env = ProcessInfo.processInfo.environment
+    env["RHYTHM_SMOKE_OVERLAY"] = "1"
+    env["RHYTHM_OVERLAY_DEBUG"] = "1"
+
+    let result: ProcessResult
+    if let binaryPath {
+        result = runProcess(
+            executable: binaryPath,
+            arguments: [],
+            environment: env,
+            timeout: 15
+        )
+    } else {
+        result = runProcess(
+            executable: "/bin/zsh",
+            arguments: ["-lc", "swift run Rhythm"],
+            environment: env,
+            timeout: 40
+        )
+    }
+
+    guard !result.timedOut else {
+        print("overlay smoke timed out")
+        return false
+    }
+    guard result.exitCode == 0 else {
+        print("overlay smoke non-zero exit: \(result.exitCode)")
+        print(result.output)
+        return false
+    }
+    guard !result.output.localizedCaseInsensitiveContains("uncaught exception") else {
+        print("overlay smoke crashed")
+        print(result.output)
+        return false
+    }
+
+    let requiredTokens = [
+        "[RhythmSmoke] start",
+        "[RhythmSmoke] trigger break",
+        "[RhythmOverlay] present frame=",
+        "[RhythmOverlay] post-check visible=true key=true main=true",
+        "[RhythmSmoke] end"
+    ]
+    for token in requiredTokens where !result.output.contains(token) {
+        print("missing smoke token: \(token)")
+        print(result.output)
+        return false
+    }
+    return true
+}
+
+private struct ProcessResult {
+    let exitCode: Int32
+    let output: String
+    let timedOut: Bool
+}
+
+private func runProcess(
+    executable: String,
+    arguments: [String],
+    environment: [String: String],
+    timeout: TimeInterval
+) -> ProcessResult {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: executable)
+    process.arguments = arguments
+    process.environment = environment
+
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
+
+    do {
+        try process.run()
+    } catch {
+        return ProcessResult(exitCode: -1, output: "failed to run \(executable): \(error)", timedOut: false)
+    }
+
+    let deadline = Date().addingTimeInterval(timeout)
+    while process.isRunning && Date() < deadline {
+        Thread.sleep(forTimeInterval: 0.1)
+    }
+
+    let timedOut = process.isRunning
+    if timedOut {
+        process.terminate()
+    }
+    process.waitUntilExit()
+    let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+    let output = String(data: outputData, encoding: .utf8) ?? ""
+    return ProcessResult(exitCode: process.terminationStatus, output: output, timedOut: timedOut)
 }
 
 @MainActor
