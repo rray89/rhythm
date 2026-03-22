@@ -16,7 +16,6 @@ final class OverlayManager: ObservableObject {
     private var countdownTimer: Timer?
     private var focusEnforcerTimer: Timer?
     private var restEndAt: Date?
-    private var originalActivationPolicy: NSApplication.ActivationPolicy?
 
     func present(restSeconds: Int) {
         dismiss()
@@ -25,8 +24,16 @@ final class OverlayManager: ObservableObject {
         restEndAt = Date().addingTimeInterval(TimeInterval(restSeconds))
         isShowing = true
 
-        let screens = NSScreen.screens
-        let targetScreens = screens.isEmpty ? [NSScreen.main].compactMap { $0 } : screens
+        var targetScreens = NSScreen.screens
+        if targetScreens.isEmpty, let main = NSScreen.main {
+            targetScreens = [main]
+        }
+        guard !targetScreens.isEmpty else {
+            // Defensive fallback: do not enter resting mode without a visible overlay.
+            isShowing = false
+            restEndAt = nil
+            return
+        }
         let mouseLocation = NSEvent.mouseLocation
         let preferredScreen = targetScreens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
             ?? NSScreen.main
@@ -48,7 +55,6 @@ final class OverlayManager: ObservableObject {
             window.collectionBehavior = [
                 .canJoinAllSpaces,
                 .fullScreenAuxiliary,
-                .transient,
                 .stationary,
                 .moveToActiveSpace
             ]
@@ -56,6 +62,8 @@ final class OverlayManager: ObservableObject {
             window.backgroundColor = .clear
             window.hasShadow = false
             window.ignoresMouseEvents = false
+            window.isReleasedWhenClosed = false
+            window.hidesOnDeactivate = false
 
             let hostingView = EscapeAwareHostingView(rootView: contentView)
             hostingView.onEscape = { [weak self] in
@@ -67,6 +75,7 @@ final class OverlayManager: ObservableObject {
             }
 
             overlayWindows.append(window)
+            window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
 
             if screen == preferredScreen {
@@ -79,8 +88,6 @@ final class OverlayManager: ObservableObject {
             focusWindow = overlayWindows.first
         }
 
-        originalActivationPolicy = NSApp.activationPolicy()
-        NSApp.setActivationPolicy(.regular)
         activateAndFocus()
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -117,11 +124,6 @@ final class OverlayManager: ObservableObject {
         overlayWindows.forEach { $0.orderOut(nil) }
         overlayWindows.removeAll()
         focusWindow = nil
-
-        if let originalActivationPolicy {
-            NSApp.setActivationPolicy(originalActivationPolicy)
-        }
-        originalActivationPolicy = nil
 
         isShowing = false
         remainingSeconds = 0
@@ -166,7 +168,10 @@ final class OverlayManager: ObservableObject {
         guard let focusWindow else { return }
         NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps, .activateAllWindows])
         NSApp.activate(ignoringOtherApps: true)
-        overlayWindows.forEach { $0.orderFrontRegardless() }
+        overlayWindows.forEach {
+            $0.level = .screenSaver
+            $0.orderFrontRegardless()
+        }
         focusWindow.makeKeyAndOrderFront(nil)
         focusWindow.makeMain()
         focusWindow.makeFirstResponder(focusWindow.contentView)
