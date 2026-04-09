@@ -15,6 +15,7 @@ public protocol RestOverlaying: AnyObject {
     var onSkipped: (() -> Void)? { get set }
     var onCompleted: (() -> Void)? { get set }
     func present(restSeconds: Int)
+    func extendRest(by seconds: Int)
     func dismiss()
     func skipByEscape()
 }
@@ -40,6 +41,8 @@ public final class TimerEngine: ObservableObject {
 
     private var cycleStartedAt = Date()
     private var restStartedAt: Date?
+    private var currentFocusTargetSeconds: Int
+    private var currentRestTargetSeconds: Int?
     private var timer: Timer?
 
     public init(
@@ -57,11 +60,8 @@ public final class TimerEngine: ObservableObject {
         self.lockMonitor = lockMonitor
         self.nowProvider = nowProvider
         self.useSystemTimer = useSystemTimer
+        self.currentFocusTargetSeconds = settingsStore.focusSeconds
         self.secondsUntilBreak = settingsStore.focusSeconds
-
-        settingsStore.onDidChange = { [weak self] in
-            self?.resetCycle()
-        }
 
         overlayManager.onSkipped = { [weak self] in
             self?.finishRest(skipped: true, skipReason: "esc")
@@ -83,7 +83,9 @@ public final class TimerEngine: ObservableObject {
     public func start() {
         timer?.invalidate()
         cycleStartedAt = nowProvider()
-        secondsUntilBreak = settingsStore.focusSeconds
+        currentFocusTargetSeconds = settingsStore.focusSeconds
+        currentRestTargetSeconds = nil
+        secondsUntilBreak = currentFocusTargetSeconds
         mode = .focusing
         lockMonitor.start()
 
@@ -101,9 +103,11 @@ public final class TimerEngine: ObservableObject {
     public func resetCycle() {
         overlayManager.dismiss()
         restStartedAt = nil
+        currentFocusTargetSeconds = settingsStore.focusSeconds
+        currentRestTargetSeconds = nil
         cycleStartedAt = nowProvider()
         mode = .focusing
-        secondsUntilBreak = settingsStore.focusSeconds
+        secondsUntilBreak = currentFocusTargetSeconds
     }
 
     public func startBreakNow() {
@@ -116,11 +120,36 @@ public final class TimerEngine: ObservableObject {
         overlayManager.skipByEscape()
     }
 
+    public func extendFocus(by seconds: Int) {
+        guard mode == .focusing, seconds > 0 else { return }
+        currentFocusTargetSeconds += seconds
+        processTick(now: nowProvider())
+    }
+
+    public func canShortenFocus(by seconds: Int) -> Bool {
+        guard mode == .focusing, seconds > 0 else { return false }
+        return focusRemainingSeconds(at: nowProvider()) >= seconds
+    }
+
+    public func shortenFocus(by seconds: Int) {
+        let now = nowProvider()
+        guard mode == .focusing, seconds > 0 else { return }
+        guard focusRemainingSeconds(at: now) >= seconds else { return }
+
+        currentFocusTargetSeconds -= seconds
+        processTick(now: now)
+    }
+
+    public func extendRest(by seconds: Int) {
+        guard mode == .resting, seconds > 0 else { return }
+        currentRestTargetSeconds = (currentRestTargetSeconds ?? settingsStore.restSeconds) + seconds
+        overlayManager.extendRest(by: seconds)
+    }
+
     public func processTick(now: Date) {
         guard mode == .focusing else { return }
 
-        let elapsed = Int(now.timeIntervalSince(cycleStartedAt))
-        let remaining = max(0, settingsStore.focusSeconds - elapsed)
+        let remaining = focusRemainingSeconds(at: now)
         secondsUntilBreak = remaining
 
         if remaining == 0 {
@@ -140,15 +169,18 @@ public final class TimerEngine: ObservableObject {
                 skipReason: "no_rest"
             )
             sessionStore.add(session)
+            currentRestTargetSeconds = nil
             cycleStartedAt = now
+            currentFocusTargetSeconds = settingsStore.focusSeconds
             mode = .focusing
-            secondsUntilBreak = settingsStore.focusSeconds
+            secondsUntilBreak = currentFocusTargetSeconds
             return
         }
 
         mode = .resting
         restStartedAt = nowProvider()
-        overlayManager.present(restSeconds: settingsStore.restSeconds)
+        currentRestTargetSeconds = settingsStore.restSeconds
+        overlayManager.present(restSeconds: currentRestTargetSeconds ?? settingsStore.restSeconds)
     }
 
     private func finishRest(skipped: Bool, skipReason: String?) {
@@ -157,7 +189,7 @@ public final class TimerEngine: ObservableObject {
         let endedAt = nowProvider()
         let actualSeconds = max(0, Int(endedAt.timeIntervalSince(restStartedAt)))
         let session = RestSession(
-            scheduledRestSeconds: settingsStore.restSeconds,
+            scheduledRestSeconds: currentRestTargetSeconds ?? settingsStore.restSeconds,
             actualRestSeconds: actualSeconds,
             startedAt: restStartedAt,
             endedAt: endedAt,
@@ -166,13 +198,20 @@ public final class TimerEngine: ObservableObject {
         )
         sessionStore.add(session)
         self.restStartedAt = nil
+        currentRestTargetSeconds = nil
 
         cycleStartedAt = nowProvider()
+        currentFocusTargetSeconds = settingsStore.focusSeconds
         mode = .focusing
-        secondsUntilBreak = settingsStore.focusSeconds
+        secondsUntilBreak = currentFocusTargetSeconds
     }
 
     private func handleScreenLocked() {
         resetCycle()
+    }
+
+    private func focusRemainingSeconds(at now: Date) -> Int {
+        let elapsed = Int(now.timeIntervalSince(cycleStartedAt))
+        return max(0, currentFocusTargetSeconds - elapsed)
     }
 }

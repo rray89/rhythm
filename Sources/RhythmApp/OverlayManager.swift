@@ -32,6 +32,8 @@ final class OverlayManager: ObservableObject {
 
         let contentView = OverlayView(
             model: self,
+            extendOneMinuteAction: { [weak self] in self?.extendRest(by: 60) },
+            extendFiveMinutesAction: { [weak self] in self?.extendRest(by: 300) },
             skipAction: { [weak self] in self?.skipByEscape() }
         )
 
@@ -88,6 +90,19 @@ final class OverlayManager: ObservableObject {
             }
         }
         RunLoop.main.add(countdownTimer!, forMode: .common)
+    }
+
+    func extendRest(by seconds: Int) {
+        guard isShowing, seconds > 0 else { return }
+
+        if let restEndAt {
+            self.restEndAt = restEndAt.addingTimeInterval(TimeInterval(seconds))
+        } else {
+            self.restEndAt = Date().addingTimeInterval(TimeInterval(seconds))
+        }
+
+        remainingSeconds = max(1, remainingSeconds + seconds)
+        log("extend rest by \(seconds)s remaining=\(remainingSeconds)")
     }
 
     func dismiss() {
@@ -185,6 +200,8 @@ final class OverlayManager: ObservableObject {
 
 private struct OverlayView: View {
     @ObservedObject var model: OverlayManager
+    let extendOneMinuteAction: () -> Void
+    let extendFiveMinutesAction: () -> Void
     let skipAction: () -> Void
 
     var body: some View {
@@ -202,7 +219,21 @@ private struct OverlayView: View {
                 Text("按 ESC 跳过本次休息")
                     .font(.system(size: 20, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.9))
-                Button("跳过") {
+                HStack(spacing: 12) {
+                    Button("延长休息 1 分钟") {
+                        extendOneMinuteAction()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.white.opacity(0.22))
+
+                    Button("延长休息 5 分钟") {
+                        extendFiveMinutesAction()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.white.opacity(0.22))
+                }
+
+                Button("跳过本次休息") {
                     skipAction()
                 }
                 .keyboardShortcut(.cancelAction)
