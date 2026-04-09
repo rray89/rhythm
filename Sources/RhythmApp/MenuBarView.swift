@@ -59,6 +59,19 @@ struct MenuBarView: View {
                         .font(.system(size: 36, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                 }
+
+                HStack(spacing: 8) {
+                    Button("延长专注 5 分钟") {
+                        timerEngine.extendFocus(by: 300)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button("延长专注 10 分钟") {
+                        timerEngine.extendFocus(by: 600)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .controlSize(.small)
             } else {
                 sectionHeading("休息进行中")
 

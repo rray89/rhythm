@@ -3,9 +3,14 @@ import SwiftUI
 
 struct RhythmMenuBarLabel: View {
     var body: some View {
-        Image(nsImage: RhythmMenuBarTemplateIcon.image)
-            .renderingMode(.template)
-            .accessibilityLabel("Rhythm")
+        HStack(spacing: 6) {
+            Image(nsImage: RhythmMenuBarTemplateIcon.image)
+                .renderingMode(.template)
+
+            Text("Rhythm")
+                .font(.system(size: 12, weight: .semibold))
+        }
+        .accessibilityLabel("Rhythm")
     }
 }
 
@@ -64,9 +69,9 @@ private enum RhythmMenuBarTemplateIcon {
     }()
 
     private static func drawTemplateIcon(in rect: NSRect) {
-        let ringRect = rect.insetBy(dx: 2.4, dy: 2.4)
+        let ringRect = rect.insetBy(dx: 2.0, dy: 2.0)
         let ring = NSBezierPath(ovalIn: ringRect)
-        ring.lineWidth = 1.45
+        ring.lineWidth = 1.9
         NSColor.black.setStroke()
         ring.stroke()
 
@@ -79,7 +84,7 @@ private enum RhythmMenuBarTemplateIcon {
         pulse.line(to: NSPoint(x: ringRect.minX + ringRect.width * 0.70, y: ringRect.minY + ringRect.height * 0.34))
         pulse.line(to: NSPoint(x: ringRect.minX + ringRect.width * 0.83, y: midY))
         pulse.line(to: NSPoint(x: ringRect.minX + ringRect.width * 0.92, y: midY))
-        pulse.lineWidth = 1.35
+        pulse.lineWidth = 1.7
         pulse.lineCapStyle = .round
         pulse.lineJoinStyle = .round
         pulse.stroke()

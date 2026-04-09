@@ -62,6 +62,38 @@ struct RhythmTDDRunner {
             return store.restSeconds == 180
         }
 
+        failures += run("focus extension stacks without changing defaults") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 900))
+            let settings = FakeSettings(focusSeconds: 10, restSeconds: 5)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(3)
+            engine.processTick(now: clock.now)
+            guard engine.mode == .focusing else { return false }
+            guard engine.secondsUntilBreak == 7 else { return false }
+
+            engine.extendFocus(by: 5)
+            guard engine.secondsUntilBreak == 12 else { return false }
+
+            engine.extendFocus(by: 10)
+            guard engine.mode == .focusing else { return false }
+            guard engine.secondsUntilBreak == 22 else { return false }
+            return settings.focusSeconds == 10
+        }
+
         failures += run("timer skip records rest session") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
             let settings = FakeSettings(focusSeconds: 10, restSeconds: 5)
@@ -92,6 +124,83 @@ struct RhythmTDDRunner {
             guard engine.secondsUntilBreak == 10 else { return false }
             guard sessions.captured.count == 1 else { return false }
             guard sessions.captured[0].scheduledRestSeconds == 5 else { return false }
+            guard sessions.captured[0].actualRestSeconds == 2 else { return false }
+            guard sessions.captured[0].skipped else { return false }
+            return sessions.captured[0].skipReason == "esc"
+        }
+
+        failures += run("extended rest completion stores final planned duration") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_250))
+            let settings = FakeSettings(focusSeconds: 12, restSeconds: 4)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(12)
+            engine.processTick(now: clock.now)
+            guard engine.mode == .resting else { return false }
+            guard overlay.lastPresentedRestSeconds == 4 else { return false }
+
+            engine.extendRest(by: 1)
+            engine.extendRest(by: 5)
+            guard overlay.extendCalls == [1, 5] else { return false }
+            guard overlay.extendedRestSeconds == 6 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(3)
+            overlay.onCompleted?()
+
+            guard engine.mode == .focusing else { return false }
+            guard engine.secondsUntilBreak == 12 else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].scheduledRestSeconds == 10 else { return false }
+            guard sessions.captured[0].actualRestSeconds == 3 else { return false }
+            return sessions.captured[0].skipped == false
+        }
+
+        failures += run("extended rest skip stores final planned duration") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_400))
+            let settings = FakeSettings(focusSeconds: 8, restSeconds: 4)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(8)
+            engine.processTick(now: clock.now)
+            guard engine.mode == .resting else { return false }
+
+            engine.extendRest(by: 1)
+            engine.extendRest(by: 5)
+            guard overlay.extendedRestSeconds == 6 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(2)
+            overlay.onSkipped?()
+
+            guard engine.mode == .focusing else { return false }
+            guard engine.secondsUntilBreak == 8 else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].scheduledRestSeconds == 10 else { return false }
             guard sessions.captured[0].actualRestSeconds == 2 else { return false }
             guard sessions.captured[0].skipped else { return false }
             return sessions.captured[0].skipReason == "esc"
@@ -128,6 +237,140 @@ struct RhythmTDDRunner {
             return sessions.captured[0].actualRestSeconds == 0
         }
 
+        failures += run("reset cycle clears focus extension") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_800))
+            let settings = FakeSettings(focusSeconds: 12, restSeconds: 4)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(4)
+            engine.processTick(now: clock.now)
+            engine.extendFocus(by: 10)
+            guard engine.secondsUntilBreak == 18 else { return false }
+
+            engine.resetCycle()
+
+            guard engine.mode == .focusing else { return false }
+            guard engine.secondsUntilBreak == 12 else { return false }
+            return overlay.dismissCallCount == 1
+        }
+
+        failures += run("settings change keeps current focus timer and applies next cycle") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_900))
+            let settings = FakeSettings(focusSeconds: 12, restSeconds: 4)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(4)
+            engine.processTick(now: clock.now)
+            engine.extendFocus(by: 10)
+            guard engine.secondsUntilBreak == 18 else { return false }
+
+            settings.focusSeconds = 20
+            engine.processTick(now: clock.now)
+
+            guard engine.mode == .focusing else { return false }
+            guard engine.secondsUntilBreak == 18 else { return false }
+            guard overlay.dismissCallCount == 0 else { return false }
+
+            engine.startBreakNow()
+            guard engine.mode == .resting else { return false }
+
+            clock.now = clock.now.addingTimeInterval(2)
+            overlay.onCompleted?()
+
+            guard engine.mode == .focusing else { return false }
+            return engine.secondsUntilBreak == 20
+        }
+
+        failures += run("rest setting change does not affect current rest") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_950))
+            let settings = FakeSettings(focusSeconds: 8, restSeconds: 4)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(8)
+            engine.processTick(now: clock.now)
+            guard engine.mode == .resting else { return false }
+            guard overlay.lastPresentedRestSeconds == 4 else { return false }
+
+            settings.restSeconds = 30
+            guard overlay.lastPresentedRestSeconds == 4 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(2)
+            overlay.onCompleted?()
+
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].scheduledRestSeconds == 4 else { return false }
+            return engine.secondsUntilBreak == 8
+        }
+
+        failures += run("rest setting change during focus applies to next rest") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_975))
+            let settings = FakeSettings(focusSeconds: 8, restSeconds: 4)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(2)
+            engine.processTick(now: clock.now)
+            guard engine.secondsUntilBreak == 6 else { return false }
+
+            settings.restSeconds = 30
+            clock.now = clock.now.addingTimeInterval(6)
+            engine.processTick(now: clock.now)
+
+            guard engine.mode == .resting else { return false }
+            return overlay.lastPresentedRestSeconds == 30
+        }
+
         failures += run("screen lock resets cycle") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 2_000))
             let settings = FakeSettings(focusSeconds: 12, restSeconds: 4)
@@ -149,6 +392,9 @@ struct RhythmTDDRunner {
             clock.now = clock.now.addingTimeInterval(5)
             engine.processTick(now: clock.now)
             guard engine.secondsUntilBreak == 7 else { return false }
+
+            engine.extendFocus(by: 10)
+            guard engine.secondsUntilBreak == 17 else { return false }
 
             lock.fireLock()
 
@@ -322,9 +568,18 @@ private final class FakeOverlay: RestOverlaying {
     var onCompleted: (() -> Void)?
     private(set) var dismissCallCount = 0
     private(set) var lastPresentedRestSeconds: Int?
+    private(set) var extendCalls: [Int] = []
+    private(set) var extendedRestSeconds = 0
 
     func present(restSeconds: Int) {
         lastPresentedRestSeconds = restSeconds
+        extendCalls = []
+        extendedRestSeconds = 0
+    }
+
+    func extendRest(by seconds: Int) {
+        extendCalls.append(seconds)
+        extendedRestSeconds += seconds
     }
 
     func dismiss() {
