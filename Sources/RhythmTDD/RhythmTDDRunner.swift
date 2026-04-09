@@ -94,6 +94,66 @@ struct RhythmTDDRunner {
             return settings.focusSeconds == 10
         }
 
+        failures += run("focus shortening brings the current break earlier") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 950))
+            let settings = FakeSettings(focusSeconds: 600, restSeconds: 5)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(120)
+            engine.processTick(now: clock.now)
+            guard engine.secondsUntilBreak == 480 else { return false }
+            guard engine.canShortenFocus(by: 300) else { return false }
+
+            engine.shortenFocus(by: 300)
+
+            guard engine.mode == .focusing else { return false }
+            guard engine.secondsUntilBreak == 180 else { return false }
+            return settings.focusSeconds == 600
+        }
+
+        failures += run("focus shortening is disabled when less than five minutes remain") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 975))
+            let settings = FakeSettings(focusSeconds: 400, restSeconds: 5)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(150)
+            engine.processTick(now: clock.now)
+            guard engine.secondsUntilBreak == 250 else { return false }
+            guard engine.canShortenFocus(by: 300) == false else { return false }
+
+            engine.shortenFocus(by: 300)
+
+            guard engine.mode == .focusing else { return false }
+            guard engine.secondsUntilBreak == 250 else { return false }
+            return overlay.lastPresentedRestSeconds == nil
+        }
+
         failures += run("timer skip records rest session") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
             let settings = FakeSettings(focusSeconds: 10, restSeconds: 5)

@@ -61,6 +61,12 @@ struct MenuBarView: View {
                 }
 
                 HStack(spacing: 8) {
+                    Button("提前休息 5 分钟") {
+                        timerEngine.shortenFocus(by: 300)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!timerEngine.canShortenFocus(by: 300))
+
                     Button("延长专注 5 分钟") {
                         timerEngine.extendFocus(by: 300)
                     }

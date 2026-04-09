@@ -126,6 +126,20 @@ public final class TimerEngine: ObservableObject {
         processTick(now: nowProvider())
     }
 
+    public func canShortenFocus(by seconds: Int) -> Bool {
+        guard mode == .focusing, seconds > 0 else { return false }
+        return focusRemainingSeconds(at: nowProvider()) >= seconds
+    }
+
+    public func shortenFocus(by seconds: Int) {
+        let now = nowProvider()
+        guard mode == .focusing, seconds > 0 else { return }
+        guard focusRemainingSeconds(at: now) >= seconds else { return }
+
+        currentFocusTargetSeconds -= seconds
+        processTick(now: now)
+    }
+
     public func extendRest(by seconds: Int) {
         guard mode == .resting, seconds > 0 else { return }
         currentRestTargetSeconds = (currentRestTargetSeconds ?? settingsStore.restSeconds) + seconds
@@ -135,8 +149,7 @@ public final class TimerEngine: ObservableObject {
     public func processTick(now: Date) {
         guard mode == .focusing else { return }
 
-        let elapsed = Int(now.timeIntervalSince(cycleStartedAt))
-        let remaining = max(0, currentFocusTargetSeconds - elapsed)
+        let remaining = focusRemainingSeconds(at: now)
         secondsUntilBreak = remaining
 
         if remaining == 0 {
@@ -195,5 +208,10 @@ public final class TimerEngine: ObservableObject {
 
     private func handleScreenLocked() {
         resetCycle()
+    }
+
+    private func focusRemainingSeconds(at now: Date) -> Int {
+        let elapsed = Int(now.timeIntervalSince(cycleStartedAt))
+        return max(0, currentFocusTargetSeconds - elapsed)
     }
 }
