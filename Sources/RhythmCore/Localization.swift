@@ -267,6 +267,22 @@ public struct AppStrings {
         }
     }
 
+    public func menuBarAccessibilityLabel(
+        mode: RhythmMode,
+        remainingSeconds: Int,
+        breakKind: BreakKind?
+    ) -> String {
+        let phase = menuBarPhaseAccessibilityLabel(mode: mode, breakKind: breakKind)
+        let countdown = countdownLabel(seconds: remainingSeconds)
+
+        switch language {
+        case .chinese:
+            return "Rhythm，\(phase)，剩余 \(countdown)"
+        case .english:
+            return "Rhythm, \(phase), \(countdown) remaining"
+        }
+    }
+
     public func pressEscapeToEndBreak(for kind: BreakKind) -> String {
         switch kind {
         case .standard:
@@ -384,6 +400,15 @@ public struct AppStrings {
             return String(format: "%01d:%02d:%02d", hours, minutes, seconds)
         }
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    private func menuBarPhaseAccessibilityLabel(mode: RhythmMode, breakKind: BreakKind?) -> String {
+        switch mode {
+        case .focusing:
+            return phaseLabel(.focusing)
+        case .resting:
+            return breakInProgressTitle(for: breakKind ?? .standard)
+        }
     }
 
     private func localized(chinese: String, english: String) -> String {

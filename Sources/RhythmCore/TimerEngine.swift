@@ -39,6 +39,15 @@ public final class TimerEngine: ObservableObject {
     @Published public private(set) var secondsRemainingInPhase: Int
     @Published public private(set) var activeBreakKind: BreakKind?
 
+    public var statusItemCountdownSeconds: Int {
+        switch mode {
+        case .focusing:
+            return secondsUntilBreak
+        case .resting:
+            return secondsRemainingInPhase
+        }
+    }
+
     private let settingsStore: RhythmSettings
     private let sessionStore: RestSessionStoring
     private let overlayManager: RestOverlaying

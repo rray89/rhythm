@@ -3,15 +3,51 @@ import RhythmCore
 import SwiftUI
 
 struct RhythmMenuBarLabel: View {
+    @ObservedObject var timerEngine: TimerEngine
+    @ObservedObject var settingsStore: SettingsStore
+
+    private let countdownWidthSample = "0:00:00"
+
+    private var strings: AppStrings {
+        AppStrings(language: settingsStore.effectiveAppLanguage)
+    }
+
+    private var countdown: String {
+        strings.countdownLabel(seconds: timerEngine.statusItemCountdownSeconds)
+    }
+
+    private var statusAccessibilityLabel: String {
+        strings.menuBarAccessibilityLabel(
+            mode: timerEngine.mode,
+            remainingSeconds: timerEngine.statusItemCountdownSeconds,
+            breakKind: timerEngine.activeBreakKind
+        )
+    }
+
     var body: some View {
         HStack(spacing: 6) {
             Image(nsImage: RhythmMenuBarTemplateIcon.image)
                 .renderingMode(.template)
 
-            Text("Rhythm")
-                .font(.system(size: 12, weight: .semibold))
+            ZStack(alignment: .trailing) {
+                statusCountdownText(countdownWidthSample)
+                    .hidden()
+                    .accessibilityHidden(true)
+
+                statusCountdownText(countdown)
+            }
         }
-        .accessibilityLabel("Rhythm")
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(statusAccessibilityLabel)
+    }
+
+    @ViewBuilder
+    private func statusCountdownText(_ value: String) -> some View {
+        Text(value)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .lineLimit(1)
     }
 }
 

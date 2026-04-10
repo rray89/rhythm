@@ -41,6 +41,7 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - extending or shortening a phase affects only the current phase
 5. Menu bar visibility and related UI resilience have been hardened further:
    - the menu bar icon has been polished for better visibility
+   - the visible `Rhythm` label is now replaced by a live countdown while keeping the icon
    - the status item can be restored if the system removes it unexpectedly
 6. The fork now supports bilingual UI:
    - the app can switch between Chinese and English in the menu settings
@@ -105,6 +106,7 @@ This fork treats menu bar presence and recoverability as part of the core experi
 Near-term expectations:
 
 - the menu bar icon should remain legible in both light and dark contexts
+- the status item should show the current countdown in both focus and break states without obvious width jitter
 - the status item should not quietly disappear because of UI or system edge cases
 - if something does go wrong, the app should prefer restoring the menu bar entry instead of forcing the user to restart
 
@@ -170,7 +172,8 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 4. The current break phase can be extended safely by 1 or 5 minutes
 5. Session history records the final planned break duration for that cycle, not the stale default value
 6. The menu bar entry remains visible or recoverable in common failure scenarios
-7. `Desk break` can continue without a blocking overlay, while other break types keep the stronger interruption model
+7. The menu bar entry keeps the icon and shows a live countdown in both focus and break states without obvious jitter
+8. `Desk break` can continue without a blocking overlay, while other break types keep the stronger interruption model
 
 ## 8. Open Questions
 
