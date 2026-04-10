@@ -50,7 +50,10 @@ struct RhythmTDDRunner {
             guard store.focusMinutes == 120 else { return false }
 
             store.restSeconds = 589
-            return store.restSeconds == 600
+            guard store.restSeconds == 600 else { return false }
+
+            store.restSeconds = 1_111
+            return store.restSeconds == 1_200
         }
 
         failures += run("legacy rest minutes migrates to rest seconds") {
@@ -143,9 +146,35 @@ struct RhythmTDDRunner {
             guard chinese.breakDurationValue(30) == "30 秒" else { return false }
             guard chinese.breakDurationValue(60) == "1 分钟" else { return false }
             guard chinese.breakDurationValue(90) == "1分30秒" else { return false }
+            guard chinese.breakDurationValue(7_200) == "2 小时" else { return false }
             guard english.breakDurationValue(30) == "30 sec" else { return false }
             guard english.breakDurationValue(60) == "1 min" else { return false }
-            return english.breakDurationValue(90) == "1m 30s"
+            guard english.breakDurationValue(90) == "1m 30s" else { return false }
+            guard english.breakDurationValue(7_200) == "2 hr" else { return false }
+            guard english.countdownLabel(seconds: 7_200) == "2:00:00" else { return false }
+            return chinese.countdownLabel(seconds: 7_200) == "2:00:00"
+        }
+
+        failures += run("legacy rest sessions decode without a break kind") {
+            let json = """
+            [
+              {
+                "actualRestSeconds": 120,
+                "createdAt": 1000,
+                "endedAt": 1000,
+                "id": "60D8C188-C1A2-4D76-B4B6-0CC448CB0F86",
+                "scheduledRestSeconds": 180,
+                "skipReason": null,
+                "skipped": false,
+                "startedAt": 880
+              }
+            ]
+            """
+            let decoder = JSONDecoder()
+            guard let data = json.data(using: .utf8) else { return false }
+            guard let sessions = try? decoder.decode([RestSession].self, from: data) else { return false }
+            guard sessions.count == 1 else { return false }
+            return sessions[0].breakKind == .standard
         }
 
         failures += run("localized session labels support chinese and english") {
@@ -310,6 +339,7 @@ struct RhythmTDDRunner {
             guard engine.mode == .focusing else { return false }
             guard engine.secondsUntilBreak == 10 else { return false }
             guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].breakKind == .standard else { return false }
             guard sessions.captured[0].scheduledRestSeconds == 5 else { return false }
             guard sessions.captured[0].actualRestSeconds == 2 else { return false }
             guard sessions.captured[0].skipped else { return false }
@@ -350,6 +380,7 @@ struct RhythmTDDRunner {
             guard engine.mode == .focusing else { return false }
             guard engine.secondsUntilBreak == 12 else { return false }
             guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].breakKind == .standard else { return false }
             guard sessions.captured[0].scheduledRestSeconds == 10 else { return false }
             guard sessions.captured[0].actualRestSeconds == 3 else { return false }
             return sessions.captured[0].skipped == false
@@ -387,10 +418,47 @@ struct RhythmTDDRunner {
             guard engine.mode == .focusing else { return false }
             guard engine.secondsUntilBreak == 8 else { return false }
             guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].breakKind == .standard else { return false }
             guard sessions.captured[0].scheduledRestSeconds == 10 else { return false }
             guard sessions.captured[0].actualRestSeconds == 2 else { return false }
             guard sessions.captured[0].skipped else { return false }
             return sessions.captured[0].skipReason == "esc"
+        }
+
+        failures += run("manual long break preset presents kind and stores it") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_450))
+            let settings = FakeSettings(focusSeconds: 8, restSeconds: 4)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            let preset = BreakPreset(kind: .gym, durationSeconds: 7_200)
+            engine.startBreak(preset: preset)
+
+            guard engine.mode == .resting else { return false }
+            guard engine.activeBreakKind == .gym else { return false }
+            guard overlay.lastPresentedBreakKind == .gym else { return false }
+            guard overlay.lastPresentedRestSeconds == 7_200 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(120)
+            overlay.onCompleted?()
+
+            guard engine.mode == .focusing else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].breakKind == .gym else { return false }
+            guard sessions.captured[0].scheduledRestSeconds == 7_200 else { return false }
+            return sessions.captured[0].actualRestSeconds == 120
         }
 
         failures += run("no-rest mode records auto skipped session") {
@@ -420,8 +488,35 @@ struct RhythmTDDRunner {
             guard sessions.captured.count == 1 else { return false }
             guard sessions.captured[0].skipped else { return false }
             guard sessions.captured[0].skipReason == "no_rest" else { return false }
+            guard sessions.captured[0].breakKind == .standard else { return false }
             guard sessions.captured[0].scheduledRestSeconds == 90 else { return false }
             return sessions.captured[0].actualRestSeconds == 0
+        }
+
+        failures += run("manual break bypasses no-rest mode") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_650))
+            let settings = FakeSettings(focusSeconds: 12, restSeconds: 90, skipRestEnabled: true)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            engine.startBreakNow()
+
+            guard engine.mode == .resting else { return false }
+            guard engine.activeBreakKind == .standard else { return false }
+            guard overlay.lastPresentedRestSeconds == 90 else { return false }
+            return sessions.captured.isEmpty
         }
 
         failures += run("reset cycle clears focus extension") {
@@ -755,11 +850,13 @@ private final class FakeOverlay: RestOverlaying {
     var onCompleted: (() -> Void)?
     private(set) var dismissCallCount = 0
     private(set) var lastPresentedRestSeconds: Int?
+    private(set) var lastPresentedBreakKind: BreakKind?
     private(set) var extendCalls: [Int] = []
     private(set) var extendedRestSeconds = 0
 
-    func present(restSeconds: Int) {
+    func present(restSeconds: Int, breakKind: BreakKind) {
         lastPresentedRestSeconds = restSeconds
+        lastPresentedBreakKind = breakKind
         extendCalls = []
         extendedRestSeconds = 0
     }

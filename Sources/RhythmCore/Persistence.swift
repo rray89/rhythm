@@ -2,6 +2,7 @@ import Foundation
 
 public struct RestSession: Codable, Identifiable {
     public let id: UUID
+    public let breakKind: BreakKind
     public let scheduledRestSeconds: Int
     public let actualRestSeconds: Int
     public let startedAt: Date
@@ -10,8 +11,21 @@ public struct RestSession: Codable, Identifiable {
     public let skipReason: String?
     public let createdAt: Date
 
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case breakKind
+        case scheduledRestSeconds
+        case actualRestSeconds
+        case startedAt
+        case endedAt
+        case skipped
+        case skipReason
+        case createdAt
+    }
+
     public init(
         id: UUID = UUID(),
+        breakKind: BreakKind = .standard,
         scheduledRestSeconds: Int,
         actualRestSeconds: Int,
         startedAt: Date,
@@ -21,6 +35,7 @@ public struct RestSession: Codable, Identifiable {
         createdAt: Date = Date()
     ) {
         self.id = id
+        self.breakKind = breakKind
         self.scheduledRestSeconds = scheduledRestSeconds
         self.actualRestSeconds = actualRestSeconds
         self.startedAt = startedAt
@@ -28,6 +43,32 @@ public struct RestSession: Codable, Identifiable {
         self.skipped = skipped
         self.skipReason = skipReason
         self.createdAt = createdAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        breakKind = try container.decodeIfPresent(BreakKind.self, forKey: .breakKind) ?? .standard
+        scheduledRestSeconds = try container.decode(Int.self, forKey: .scheduledRestSeconds)
+        actualRestSeconds = try container.decode(Int.self, forKey: .actualRestSeconds)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        endedAt = try container.decode(Date.self, forKey: .endedAt)
+        skipped = try container.decode(Bool.self, forKey: .skipped)
+        skipReason = try container.decodeIfPresent(String.self, forKey: .skipReason)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(breakKind, forKey: .breakKind)
+        try container.encode(scheduledRestSeconds, forKey: .scheduledRestSeconds)
+        try container.encode(actualRestSeconds, forKey: .actualRestSeconds)
+        try container.encode(startedAt, forKey: .startedAt)
+        try container.encode(endedAt, forKey: .endedAt)
+        try container.encode(skipped, forKey: .skipped)
+        try container.encodeIfPresent(skipReason, forKey: .skipReason)
+        try container.encode(createdAt, forKey: .createdAt)
     }
 }
 
@@ -105,8 +146,8 @@ public final class SettingsStore: ObservableObject {
     public static let focusMinutesStep = 5
 
     public static let minRestSeconds = 30
-    public static let maxRestSeconds = 600
-    public static let restPresetSeconds = [30, 60, 90, 120, 180, 240, 300, 600]
+    public static let maxRestSeconds = 1_200
+    public static let restPresetSeconds = [30, 60, 90, 120, 180, 240, 300, 600, 900, 1_200]
 
     @Published public var focusMinutes: Int {
         didSet {
