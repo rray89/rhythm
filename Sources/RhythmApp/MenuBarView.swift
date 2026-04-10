@@ -105,10 +105,26 @@ struct MenuBarView: View {
 
                     Spacer(minLength: 0)
 
-                    Text(strings.escapeToEndBreakLabel(for: currentBreakKind))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                    Text(strings.countdownLabel(seconds: timerEngine.secondsRemainingInPhase))
+                        .font(.system(size: 32, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
                 }
+
+                HStack(spacing: 8) {
+                    ForEach(currentBreakKind.extensionMinutes, id: \.self) { minutes in
+                        Button(strings.extendBreakButton(minutes: minutes)) {
+                            timerEngine.extendRest(by: minutes * 60)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    if currentBreakKind.usesBlockingOverlay {
+                        Text(strings.escapeToEndBreakLabel(for: currentBreakKind))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .controlSize(.small)
             }
         }
     }

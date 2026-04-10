@@ -16,6 +16,7 @@ final class AppModel: ObservableObject {
         let overlayManager = OverlayManager(settingsStore: settingsStore)
         let lockMonitor = LockMonitor()
         let launchAtLoginManager = LaunchAtLoginManager()
+        let breakNotificationManager = BreakNotificationManager(settingsStore: settingsStore)
 
         self.settingsStore = settingsStore
         self.sessionStore = sessionStore
@@ -25,7 +26,8 @@ final class AppModel: ObservableObject {
             settingsStore: settingsStore,
             sessionStore: sessionStore,
             overlayManager: overlayManager,
-            lockMonitor: lockMonitor
+            lockMonitor: lockMonitor,
+            breakNotifier: breakNotificationManager
         )
 
         runOverlaySmokeIfNeeded()

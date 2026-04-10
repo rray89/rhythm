@@ -9,13 +9,11 @@ final class OverlayManager: ObservableObject {
     @Published private(set) var activeBreakKind: BreakKind = .standard
 
     var onSkipped: (() -> Void)?
-    var onCompleted: (() -> Void)?
+    var onExtendRequested: ((Int) -> Void)?
 
     private var overlayWindow: OverlayWindow?
     private var keyMonitor: Any?
-    private var countdownTimer: Timer?
     private var focusEnforcerTimer: Timer?
-    private var restEndAt: Date?
     private var shownAt: Date?
     private let debugOverlay = ProcessInfo.processInfo.environment["RHYTHM_OVERLAY_DEBUG"] == "1"
     private var originalActivationPolicy: NSApplication.ActivationPolicy?
@@ -28,14 +26,15 @@ final class OverlayManager: ObservableObject {
     func present(restSeconds: Int, breakKind: BreakKind) {
         dismiss()
 
+        remainingSeconds = max(1, restSeconds)
+        shownAt = Date()
+        activeBreakKind = breakKind
+
+        guard breakKind.usesBlockingOverlay else { return }
+
         let screenFrame = (activeScreen() ?? NSScreen.main ?? NSScreen.screens.first)?.frame
             ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-
-        remainingSeconds = max(1, restSeconds)
-        restEndAt = Date().addingTimeInterval(TimeInterval(restSeconds))
-        shownAt = Date()
         isShowing = true
-        activeBreakKind = breakKind
 
         let contentView = OverlayView(
             model: self,
@@ -89,34 +88,15 @@ final class OverlayManager: ObservableObject {
         }
 
         startFocusEnforcer()
-
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.tick()
-            }
-        }
-        RunLoop.main.add(countdownTimer!, forMode: .common)
     }
 
-    func extendRest(by seconds: Int) {
-        guard isShowing, seconds > 0 else { return }
-
-        if let restEndAt {
-            self.restEndAt = restEndAt.addingTimeInterval(TimeInterval(seconds))
-        } else {
-            self.restEndAt = Date().addingTimeInterval(TimeInterval(seconds))
-        }
-
-        remainingSeconds = max(1, remainingSeconds + seconds)
-        log("extend rest by \(seconds)s remaining=\(remainingSeconds)")
+    func updateRemaining(restSeconds: Int) {
+        remainingSeconds = max(0, restSeconds)
     }
 
     func dismiss() {
-        countdownTimer?.invalidate()
-        countdownTimer = nil
         focusEnforcerTimer?.invalidate()
         focusEnforcerTimer = nil
-        restEndAt = nil
         shownAt = nil
 
         if let keyMonitor {
@@ -147,17 +127,6 @@ final class OverlayManager: ObservableObject {
         log("skip by esc")
         dismiss()
         onSkipped?()
-    }
-
-    private func tick() {
-        guard let restEndAt else { return }
-        let nextRemaining = max(0, Int(ceil(restEndAt.timeIntervalSinceNow)))
-        remainingSeconds = nextRemaining
-
-        if nextRemaining == 0 {
-            dismiss()
-            onCompleted?()
-        }
     }
 
     private func startFocusEnforcer() {
@@ -236,7 +205,7 @@ private struct OverlayView: View {
                 HStack(spacing: 12) {
                     ForEach(extensionMinutes, id: \.self) { minutes in
                         Button(strings.extendBreakButton(minutes: minutes)) {
-                            model.extendRest(by: minutes * 60)
+                            model.onExtendRequested?(minutes * 60)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.white.opacity(0.22))

@@ -79,10 +79,8 @@ public struct AppStrings {
             return localized(chinese: "小憩进行中", english: "Nap break active")
         case .errand:
             return localized(chinese: "外出休息进行中", english: "Errand break active")
-        case .duolingo:
-            return localized(chinese: "多邻国休息进行中", english: "Duolingo break active")
-        case .walk:
-            return localized(chinese: "散步休息进行中", english: "Walk break active")
+        case .desk:
+            return localized(chinese: "可继续用电脑，但别工作", english: "Stay on your Mac, just not for work")
         }
     }
 
@@ -218,10 +216,8 @@ public struct AppStrings {
             return localized(chinese: "小憩", english: "Nap")
         case .errand:
             return localized(chinese: "外出", english: "Errand")
-        case .duolingo:
-            return localized(chinese: "多邻国", english: "Duolingo")
-        case .walk:
-            return localized(chinese: "散步", english: "Walk")
+        case .desk:
+            return localized(chinese: "桌前休息", english: "Desk break")
         }
     }
 
@@ -266,10 +262,8 @@ public struct AppStrings {
             return localized(chinese: "小憩时间", english: "Nap Break")
         case .errand:
             return localized(chinese: "外出时间", english: "Errand Break")
-        case .duolingo:
-            return localized(chinese: "多邻国时间", english: "Duolingo Break")
-        case .walk:
-            return localized(chinese: "散步时间", english: "Walk Break")
+        case .desk:
+            return localized(chinese: "桌前休息", english: "Desk Break")
         }
     }
 
@@ -296,6 +290,32 @@ public struct AppStrings {
             return "延长 \(minutes) 分钟"
         case .english:
             return "Break +\(minutes)m"
+        }
+    }
+
+    public func breakCompletedNotificationTitle(for kind: BreakKind) -> String {
+        switch kind {
+        case .desk:
+            return localized(chinese: "桌前休息结束", english: "Desk break finished")
+        case .standard:
+            return localized(chinese: "休息结束", english: "Break finished")
+        case .meal:
+            return localized(chinese: "用餐休息结束", english: "Meal break finished")
+        case .gym:
+            return localized(chinese: "健身休息结束", english: "Gym break finished")
+        case .nap:
+            return localized(chinese: "小憩结束", english: "Nap break finished")
+        case .errand:
+            return localized(chinese: "外出休息结束", english: "Errand break finished")
+        }
+    }
+
+    public func breakCompletedNotificationBody(for kind: BreakKind) -> String {
+        switch kind {
+        case .desk:
+            return localized(chinese: "Rhythm 已恢复专注计时。", english: "Rhythm has resumed focus time.")
+        case .standard, .meal, .gym, .nap, .errand:
+            return localized(chinese: "Rhythm 已恢复专注计时。", english: "Rhythm has resumed focus time.")
         }
     }
 

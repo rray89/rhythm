@@ -77,10 +77,8 @@ private struct BreakPresetButton: View {
             return "bed.double"
         case .errand:
             return "bag"
-        case .duolingo:
-            return "text.book.closed"
-        case .walk:
-            return "figure.walk"
+        case .desk:
+            return "desktopcomputer"
         }
     }
 }
