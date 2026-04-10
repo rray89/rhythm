@@ -5,7 +5,7 @@
 This document captures the product direction and near-term ideas for my local fork. It does not replace the upstream V1 design document.
 
 - `docs/V1-design.md` remains the historical V1 baseline for upstream `main`
-- `docs/V2-prd.md` is the Chinese fork draft
+- `docs/V2-prd.zh.md` is the Chinese fork draft
 - this file is the English version of the fork draft for readers who prefer English
 
 In short: if you want to understand upstream V1, read `docs/V1-design.md`; if you want to understand where this fork may go next, read one of the V2 PRD drafts.
@@ -42,6 +42,10 @@ This fork has already explored the following ideas in branches such as `codex/ph
 5. Menu bar visibility and related UI resilience have been hardened further:
    - the menu bar icon has been polished for better visibility
    - the status item can be restored if the system removes it unexpectedly
+6. The fork now supports bilingual UI:
+   - the app can switch between Chinese and English in the menu settings
+   - first-run language defaults to Chinese only for `zh*` system languages, and to English otherwise
+   - future user-facing features are expected to remain bilingual by default
 
 ## 3. What V2 Is Trying to Improve
 
@@ -51,7 +55,7 @@ The core V2 goals are:
 
 1. Separate "default rhythm" from "adjustments to the current phase"
 2. Let common in-the-moment decisions happen directly from the menu bar or overlay
-3. Leave room for localization and longer-break scenarios without introducing a heavy product surface
+3. Make bilingual UI the default product baseline for all future features, while leaving room for longer-break scenarios without introducing a heavy product surface
 
 ## 4. Product Direction for V2
 
@@ -98,20 +102,20 @@ Near-term expectations:
 - the status item should not quietly disappear because of UI or system edge cases
 - if something does go wrong, the app should prefer restoring the menu bar entry instead of forcing the user to restart
 
-## 5. Near-Term Candidate Directions
+## 5. Near-Term Directions
 
-The following ideas are promising V2 directions, but they are still proposals rather than commitments.
+The following areas shape the near-term V2 roadmap. Some are now part of the baseline, while others remain open product directions.
 
-### 5.1 English / Chinese Localization
+### 5.1 Bilingual UI Baseline
 
-The goal is to support at least English and Chinese UI text so the fork is not tied to a Chinese-only interface.
+The fork now treats bilingual UI as a shipped baseline rather than a future idea.
 
-Expected scope:
+Current expectations:
 
-- menu bar status text
-- settings labels and buttons
-- break overlay copy
-- better alignment between README language and product docs
+- the visible app UI supports both English and Chinese
+- the menu panel includes a language switch for `中文` and `English`
+- first-run language follows a simple rule: `zh*` system languages use Chinese, and all other system languages use English
+- future user-facing features should ship with both Chinese and English copy instead of adding a single-language UI first
 
 ### 5.2 Longer Break Support
 
@@ -163,7 +167,6 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 
 These questions remain intentionally unresolved in this draft:
 
-1. Should the next PR focus on localization first, or should it first clarify the longer-break model?
-2. Should longer breaks be implemented as larger presets only, or as a separate long-break mode?
-3. Should daily totals be simple numbers only, or should there be a minimal trend view?
-4. Should screen-lock behavior stay as an immediate reset, or should it vary based on how long the machine was locked?
+1. Should longer breaks be implemented as larger presets only, or as a separate long-break mode?
+2. Should daily totals be simple numbers only, or should there be a minimal trend view?
+3. Should screen-lock behavior stay as an immediate reset, or should it vary based on how long the machine was locked?

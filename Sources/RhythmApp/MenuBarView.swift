@@ -8,6 +8,14 @@ struct MenuBarView: View {
     @ObservedObject var sessionStore: SessionStore
     @ObservedObject var launchAtLoginManager: LaunchAtLoginManager
 
+    private var strings: AppStrings {
+        AppStrings(language: settingsStore.effectiveAppLanguage)
+    }
+
+    private var settingTitleWidth: CGFloat {
+        settingsStore.effectiveAppLanguage == .english ? 78 : 64
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             headerSection
@@ -23,11 +31,11 @@ struct MenuBarView: View {
 
     private var headerSection: some View {
         HStack(spacing: 10) {
-            RhythmBrandBadge()
+            RhythmBrandBadge(language: settingsStore.effectiveAppLanguage)
 
             Spacer(minLength: 0)
 
-            Text(timerEngine.mode == .focusing ? "专注中" : "休息中")
+            Text(strings.phaseLabel(timerEngine.mode))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
@@ -42,12 +50,12 @@ struct MenuBarView: View {
     private var statusSection: some View {
         sectionContainer {
             if timerEngine.mode == .focusing {
-                sectionHeading("距离休息")
+                sectionHeading(strings.timeUntilBreakTitle)
 
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
                         if settingsStore.skipRestEnabled {
-                            Text("不休息模式：到点自动跳过并记录")
+                            Text(strings.noRestModeDescription)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
@@ -55,42 +63,42 @@ struct MenuBarView: View {
 
                     Spacer(minLength: 0)
 
-                    Text(formatDuration(timerEngine.secondsUntilBreak))
+                    Text(strings.countdownLabel(seconds: timerEngine.secondsUntilBreak))
                         .font(.system(size: 36, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                 }
 
                 HStack(spacing: 8) {
-                    Button("提前休息 5 分钟") {
+                    Button(strings.startBreakEarlyFiveMinutesButton) {
                         timerEngine.shortenFocus(by: 300)
                     }
                     .buttonStyle(.bordered)
                     .disabled(!timerEngine.canShortenFocus(by: 300))
 
-                    Button("延长专注 5 分钟") {
+                    Button(strings.extendFocusFiveMinutesButton) {
                         timerEngine.extendFocus(by: 300)
                     }
                     .buttonStyle(.bordered)
 
-                    Button("延长专注 10 分钟") {
+                    Button(strings.extendFocusTenMinutesButton) {
                         timerEngine.extendFocus(by: 600)
                     }
                     .buttonStyle(.bordered)
                 }
                 .controlSize(.small)
             } else {
-                sectionHeading("休息进行中")
+                sectionHeading(strings.breakInProgressTitle)
 
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("休息遮罩已显示")
+                        Text(strings.breakOverlayShown)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
                     Spacer(minLength: 0)
 
-                    Text("ESC 跳过")
+                    Text(strings.escapeToSkipLabel)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -100,11 +108,11 @@ struct MenuBarView: View {
 
     private var configSection: some View {
         sectionContainer {
-            sectionHeading("节奏设置")
+            sectionHeading(strings.settingsTitle)
 
             compactSettingRow(
-                title: "专注间隔",
-                value: "\(settingsStore.focusMinutes) 分钟",
+                title: strings.focusIntervalTitle,
+                value: strings.focusMinutesValue(settingsStore.focusMinutes),
                 canDecrease: settingsStore.focusMinutes > SettingsStore.minFocusMinutes,
                 canIncrease: settingsStore.focusMinutes < SettingsStore.maxFocusMinutes,
                 onDecrease: decreaseFocusDuration,
@@ -112,16 +120,24 @@ struct MenuBarView: View {
             )
 
             compactSettingRow(
-                title: "休息时长",
-                value: restSettingLabel(settingsStore.restSeconds),
+                title: strings.breakDurationTitle,
+                value: strings.breakDurationValue(settingsStore.restSeconds),
                 canDecrease: settingsStore.restSeconds > (SettingsStore.restPresetSeconds.first ?? SettingsStore.minRestSeconds),
                 canIncrease: settingsStore.restSeconds < (SettingsStore.restPresetSeconds.last ?? SettingsStore.maxRestSeconds),
                 onDecrease: decreaseRestDuration,
                 onIncrease: increaseRestDuration
             )
 
+            languageSettingRow(
+                title: strings.languageTitle,
+                selection: Binding(
+                    get: { settingsStore.effectiveAppLanguage },
+                    set: { settingsStore.appLanguageOverride = $0 }
+                )
+            )
+
             toggleSettingRow(
-                title: "不休息",
+                title: strings.noRestTitle,
                 isOn: Binding(
                     get: { settingsStore.skipRestEnabled },
                     set: { settingsStore.skipRestEnabled = $0 }
@@ -129,7 +145,7 @@ struct MenuBarView: View {
             )
 
             toggleSettingRow(
-                title: "开机启动",
+                title: strings.launchAtLoginTitle,
                 isOn: Binding(
                     get: { launchAtLoginManager.isEnabled },
                     set: { launchAtLoginManager.setEnabled($0) }
@@ -137,8 +153,8 @@ struct MenuBarView: View {
                 disabled: launchAtLoginManager.isApplying || launchAtLoginManager.isToggleDisabled
             )
 
-            if let status = launchAtLoginManager.statusMessage {
-                Text(status)
+            if let statusState = launchAtLoginManager.statusState {
+                Text(strings.launchAtLoginStatus(statusState))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -148,15 +164,15 @@ struct MenuBarView: View {
     private var sessionsSection: some View {
         sectionContainer {
             HStack {
-                sectionHeading("最近记录")
+                sectionHeading(strings.recentSessionsTitle)
                 Spacer()
-                Text("\(sessionStore.sessions.count) 次")
+                Text(strings.sessionCountLabel(sessionStore.sessions.count))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             if sessionStore.sessions.isEmpty {
-                Text("暂无记录")
+                Text(strings.noSessionsYet)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -167,7 +183,7 @@ struct MenuBarView: View {
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(sessionResultLabel(session))
+                        Text(strings.sessionResultLabel(for: session))
                             .font(.caption)
                             .monospacedDigit()
                             .foregroundStyle(session.skipped ? .orange : .green)
@@ -180,49 +196,31 @@ struct MenuBarView: View {
     private var actionSection: some View {
         HStack(spacing: 8) {
             if timerEngine.mode == .focusing {
-                Button("立即休息") {
+                Button(strings.startBreakNowButton) {
                     timerEngine.startBreakNow()
                 }
                 .buttonStyle(.bordered)
             } else {
-                Button("跳过本次休息") {
+                Button(strings.skipCurrentBreakButton) {
                     timerEngine.skipBreak()
                 }
                 .buttonStyle(.bordered)
             }
 
-            Button("重置计时") {
+            Button(strings.resetTimerButton) {
                 timerEngine.resetCycle()
             }
             .buttonStyle(.bordered)
 
             Spacer()
 
-            Button("退出") {
+            Button(strings.quitButton) {
                 NSApplication.shared.terminate(nil)
             }
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
         }
         .controlSize(.small)
-    }
-
-    private func formatDuration(_ seconds: Int) -> String {
-        let minute = max(0, seconds) / 60
-        let second = max(0, seconds) % 60
-        return String(format: "%02d:%02d", minute, second)
-    }
-
-    private func restSettingLabel(_ seconds: Int) -> String {
-        if seconds < 60 {
-            return "\(seconds) 秒"
-        }
-        let minute = seconds / 60
-        let second = seconds % 60
-        if second == 0 {
-            return "\(minute) 分钟"
-        }
-        return "\(minute)分\(second)秒"
     }
 
     @ViewBuilder
@@ -236,7 +234,7 @@ struct MenuBarView: View {
     ) -> some View {
         HStack(spacing: 10) {
             Text(title)
-                .frame(width: 64, alignment: .leading)
+                .frame(width: settingTitleWidth, alignment: .leading)
 
             Spacer(minLength: 0)
 
@@ -256,6 +254,27 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder
+    private func languageSettingRow(title: String, selection: Binding<AppLanguage>) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .frame(width: settingTitleWidth, alignment: .leading)
+
+            Spacer(minLength: 0)
+
+            Picker("", selection: selection) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(strings.languageOptionLabel(language))
+                        .tag(language)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 166)
+        }
+        .font(.subheadline)
+    }
+
+    @ViewBuilder
     private func toggleSettingRow(
         title: String,
         isOn: Binding<Bool>,
@@ -263,7 +282,7 @@ struct MenuBarView: View {
     ) -> some View {
         HStack(spacing: 10) {
             Text(title)
-                .frame(width: 64, alignment: .leading)
+                .frame(width: settingTitleWidth, alignment: .leading)
 
             Spacer(minLength: 0)
 
@@ -319,16 +338,6 @@ struct MenuBarView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MM-dd HH:mm"
         return formatter.string(from: date)
-    }
-
-    private func sessionResultLabel(_ session: RestSession) -> String {
-        if session.skipped {
-            if session.skipReason == "no_rest" {
-                return "不休息 \(formatDuration(session.actualRestSeconds))"
-            }
-            return "跳过 \(formatDuration(session.actualRestSeconds))"
-        }
-        return "完成 \(formatDuration(session.actualRestSeconds))"
     }
 
     @ViewBuilder

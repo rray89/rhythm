@@ -98,6 +98,7 @@ public final class SettingsStore: ObservableObject {
     public static let restSecondsKey = "restSeconds"
     public static let legacyRestMinutesKey = "restMinutes"
     public static let skipRestEnabledKey = "skipRestEnabled"
+    public static let appLanguageOverrideKey = "appLanguageOverride"
 
     public static let minFocusMinutes = 10
     public static let maxFocusMinutes = 120
@@ -147,14 +148,36 @@ public final class SettingsStore: ObservableObject {
         }
     }
 
+    @Published public var appLanguageOverride: AppLanguage? {
+        didSet {
+            if oldValue == appLanguageOverride {
+                return
+            }
+
+            if let appLanguageOverride {
+                userDefaults.set(appLanguageOverride.rawValue, forKey: Self.appLanguageOverrideKey)
+            } else {
+                userDefaults.removeObject(forKey: Self.appLanguageOverrideKey)
+            }
+        }
+    }
+
     public var onDidChange: (() -> Void)?
 
     public var focusSeconds: Int { focusMinutes * 60 }
+    public var effectiveAppLanguage: AppLanguage {
+        appLanguageOverride ?? AppLanguage.resolveSystemLanguage(from: preferredLanguagesProvider())
+    }
 
     private let userDefaults: UserDefaults
+    private let preferredLanguagesProvider: () -> [String]
 
-    public init(userDefaults: UserDefaults = .standard) {
+    public init(
+        userDefaults: UserDefaults = .standard,
+        preferredLanguagesProvider: @escaping () -> [String] = { Locale.preferredLanguages }
+    ) {
         self.userDefaults = userDefaults
+        self.preferredLanguagesProvider = preferredLanguagesProvider
         let storedFocus = userDefaults.object(forKey: Self.focusMinutesKey) as? Int
         self.focusMinutes = Self.normalizeFocusMinutes(storedFocus ?? 30)
 
@@ -170,6 +193,12 @@ public final class SettingsStore: ObservableObject {
             self.skipRestEnabled = storedSkipRestEnabled
         } else {
             self.skipRestEnabled = false
+        }
+
+        if let storedAppLanguage = userDefaults.string(forKey: Self.appLanguageOverrideKey) {
+            self.appLanguageOverride = AppLanguage(rawValue: storedAppLanguage)
+        } else {
+            self.appLanguageOverride = nil
         }
     }
 

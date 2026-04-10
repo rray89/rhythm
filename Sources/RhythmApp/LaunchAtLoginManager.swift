@@ -1,4 +1,5 @@
 import Foundation
+import RhythmCore
 import ServiceManagement
 
 @MainActor
@@ -6,7 +7,7 @@ final class LaunchAtLoginManager: ObservableObject {
     @Published private(set) var isEnabled = false
     @Published private(set) var isApplying = false
     @Published private(set) var isToggleDisabled = false
-    @Published private(set) var statusMessage: String?
+    @Published private(set) var statusState: LaunchAtLoginStatusState?
 
     private let legacyLaunchAgentLabel = "com.xiao2dou.rhythm.launch-at-login"
     private let launchctlPath = "/bin/launchctl"
@@ -41,7 +42,7 @@ final class LaunchAtLoginManager: ObservableObject {
             refreshStatus()
         } catch {
             refreshStatus()
-            statusMessage = "开机启动设置失败，请稍后重试"
+            statusState = .setFailed
         }
     }
 
@@ -49,7 +50,7 @@ final class LaunchAtLoginManager: ObservableObject {
         guard isInstalledInApplications else {
             isEnabled = false
             isToggleDisabled = true
-            statusMessage = "请先将 Rhythm 放到“应用程序”后，再开启开机启动"
+            statusState = .moveToApplicationsRequired
             return
         }
 
@@ -58,19 +59,19 @@ final class LaunchAtLoginManager: ObservableObject {
         switch status {
         case .enabled:
             isEnabled = true
-            statusMessage = nil
+            statusState = nil
         case .requiresApproval:
             isEnabled = true
-            statusMessage = "已请求开启，请在系统设置的“登录项”中允许"
+            statusState = .approvalRequired
         case .notRegistered:
             isEnabled = false
-            statusMessage = nil
+            statusState = nil
         case .notFound:
             isEnabled = false
-            statusMessage = "开机启动暂不可用，请重新安装后重试"
+            statusState = .unavailable
         @unknown default:
             isEnabled = false
-            statusMessage = "开机启动状态未知"
+            statusState = .unknown
         }
     }
 
