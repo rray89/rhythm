@@ -21,6 +21,7 @@ Rhythm 是一个 macOS 节奏提醒工具，帮助用户建立稳定的「专注
 ## V1 功能
 
 - 自定义节奏：可设置专注间隔（10-120 分钟，5 分钟步进）和休息时长（30 秒-10 分钟，常用档位）
+- 中英双语：支持 `中文` / `English` 界面切换；首次使用时，`zh*` 系统语言默认中文，其他语言默认英文
 - 不休息模式：可开启“不休息”，到点自动跳过并记录本次应休息会话
 - 锁屏重置：检测到系统锁屏后重置当前计时周期
 - 休息遮罩：到点展示全屏半透明遮罩，支持 `ESC` 跳过
@@ -52,6 +53,7 @@ swift run RhythmTDD
 该命令会执行一组可重复的回归检查，覆盖：
 
 - 设置变更回调、范围归一化与历史配置迁移
+- 中英双语解析、持久化与文案格式化
 - 跳过休息后的 session 记录
 - 锁屏导致的计时周期重置
 - 休息遮罩可见性与焦点（自动 smoke）
@@ -89,12 +91,14 @@ RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
 │   │   ├── LockMonitor.swift
 │   │   ├── MenuBarView.swift
 │   │   ├── OverlayManager.swift
+│   │   ├── RhythmBrand.swift
 │   │   └── RhythmApp.swift
 │   ├── RhythmCore/
+│   │   ├── Localization.swift
 │   │   ├── Persistence.swift
 │   │   └── TimerEngine.swift
 │   └── RhythmTDD/
-│       └── main.swift
+│       └── RhythmTDDRunner.swift
 └── Package.swift
 ```
 
