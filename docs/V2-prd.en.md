@@ -24,9 +24,9 @@ Upstream `main` is still centered on a stable, usable break-reminder app for mac
 - no-rest mode
 - local session history
 
-### 2.2 Behavior Explored in This Fork
+### 2.2 Behavior Already Shipped in This Fork
 
-This fork has already explored the following ideas in branches such as `codex/phase-extension-controls`. These should be treated as V2 candidate behavior, not as default behavior already shipped on upstream `main`.
+This fork now ships the following behavior beyond the upstream V1 baseline:
 
 1. The current focus phase can be adjusted directly:
    - `Extend Focus 5 Minutes`
@@ -46,6 +46,12 @@ This fork has already explored the following ideas in branches such as `codex/ph
    - the app can switch between Chinese and English in the menu settings
    - first-run language defaults to Chinese only for `zh*` system languages, and to English otherwise
    - future user-facing features are expected to remain bilingual by default
+7. Longer break support is now part of the shipped fork baseline:
+   - the regular break default can be set up to 20 minutes
+   - the menu includes direct presets for `Meal`, `Gym`, `Nap`, `Errand`, and `Desk break`
+   - `Desk break` is intentionally non-blocking and continues in the menu without forcing a full-screen overlay
+   - the blocking overlay remains the default for regular breaks and away-from-screen long breaks
+   - session history now records the break kind as well as planned and actual duration
 
 ## 3. What V2 Is Trying to Improve
 
@@ -117,14 +123,16 @@ Current expectations:
 - first-run language follows a simple rule: `zh*` system languages use Chinese, and all other system languages use English
 - future user-facing features should ship with both Chinese and English copy instead of adding a single-language UI first
 
-### 5.2 Longer Break Support
+### 5.2 Longer Break Support Baseline
 
-V1 is mostly designed around short breaks. This fork may also support longer breaks for lunch, naps, stretching, walking, or gym time.
+Longer breaks are no longer just a future direction in this fork. The current shipped model is:
 
-There are currently two likely directions:
+- regular short breaks remain configurable and can now go up to 20 minutes
+- `Meal`, `Gym`, `Nap`, and `Errand` are longer blocking breaks that still use the full-screen overlay
+- `Desk break` is the deliberate on-screen, non-work break for watching a video, reading posts, or similar casual use
+- when `Desk break` ends, Rhythm returns to focus automatically and should notify the user when notification permissions allow
 
-- add larger break presets only
-- introduce a distinct long-break mode instead of treating everything as the same kind of break
+This keeps one clear screen-allowed category without turning every break into a separate behavior matrix.
 
 ### 5.3 Daily Focus / Break Totals
 
@@ -162,11 +170,11 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 4. The current break phase can be extended safely by 1 or 5 minutes
 5. Session history records the final planned break duration for that cycle, not the stale default value
 6. The menu bar entry remains visible or recoverable in common failure scenarios
+7. `Desk break` can continue without a blocking overlay, while other break types keep the stronger interruption model
 
 ## 8. Open Questions
 
 These questions remain intentionally unresolved in this draft:
 
-1. Should longer breaks be implemented as larger presets only, or as a separate long-break mode?
-2. Should daily totals be simple numbers only, or should there be a minimal trend view?
-3. Should screen-lock behavior stay as an immediate reset, or should it vary based on how long the machine was locked?
+1. Should daily totals be simple numbers only, or should there be a minimal trend view?
+2. Should screen-lock behavior stay as an immediate reset, or should it vary based on how long the machine was locked?

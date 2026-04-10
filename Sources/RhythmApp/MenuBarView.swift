@@ -16,10 +16,17 @@ struct MenuBarView: View {
         settingsStore.effectiveAppLanguage == .english ? 78 : 64
     }
 
+    private var currentBreakKind: BreakKind {
+        timerEngine.activeBreakKind ?? .standard
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             headerSection
             statusSection
+            if timerEngine.mode == .focusing {
+                longBreaksSection
+            }
             configSection
             sessionsSection
             actionSection
@@ -87,21 +94,47 @@ struct MenuBarView: View {
                 }
                 .controlSize(.small)
             } else {
-                sectionHeading(strings.breakInProgressTitle)
+                sectionHeading(strings.breakInProgressTitle(for: currentBreakKind))
 
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(strings.breakOverlayShown)
+                        Text(strings.breakStatusDetail(for: currentBreakKind))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
                     Spacer(minLength: 0)
 
-                    Text(strings.escapeToSkipLabel)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                    Text(strings.countdownLabel(seconds: timerEngine.secondsRemainingInPhase))
+                        .font(.system(size: 32, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
                 }
+
+                HStack(spacing: 8) {
+                    ForEach(currentBreakKind.extensionMinutes, id: \.self) { minutes in
+                        Button(strings.extendBreakButton(minutes: minutes)) {
+                            timerEngine.extendRest(by: minutes * 60)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    if currentBreakKind.usesBlockingOverlay {
+                        Text(strings.escapeToEndBreakLabel(for: currentBreakKind))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .controlSize(.small)
+            }
+        }
+    }
+
+    private var longBreaksSection: some View {
+        sectionContainer {
+            sectionHeading(strings.longBreaksTitle)
+
+            LongBreakPresetsView(language: settingsStore.effectiveAppLanguage) { preset in
+                timerEngine.startBreak(preset: preset)
             }
         }
     }
@@ -201,7 +234,7 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(.bordered)
             } else {
-                Button(strings.skipCurrentBreakButton) {
+                Button(strings.endBreakButton(for: currentBreakKind)) {
                     timerEngine.skipBreak()
                 }
                 .buttonStyle(.bordered)

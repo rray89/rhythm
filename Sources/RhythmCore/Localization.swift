@@ -54,12 +54,47 @@ public struct AppStrings {
         localized(chinese: "休息进行中", english: "On Break")
     }
 
+    public func breakInProgressTitle(for kind: BreakKind) -> String {
+        switch kind {
+        case .standard:
+            return breakInProgressTitle
+        default:
+            return activeBreakTitle(for: kind)
+        }
+    }
+
     public var breakOverlayShown: String {
         localized(chinese: "休息遮罩已显示", english: "Overlay active")
     }
 
+    public func breakStatusDetail(for kind: BreakKind) -> String {
+        switch kind {
+        case .standard:
+            return breakOverlayShown
+        case .meal:
+            return localized(chinese: "用餐休息进行中", english: "Meal break active")
+        case .gym:
+            return localized(chinese: "健身休息进行中", english: "Gym break active")
+        case .nap:
+            return localized(chinese: "小憩进行中", english: "Nap break active")
+        case .errand:
+            return localized(chinese: "外出休息进行中", english: "Errand break active")
+        case .desk:
+            return localized(chinese: "可继续用电脑，但别工作", english: "Stay on your Mac, just not for work")
+        }
+    }
+
     public var escapeToSkipLabel: String {
         localized(chinese: "ESC 跳过", english: "ESC to skip")
+    }
+
+    public func escapeToEndBreakLabel(for kind: BreakKind) -> String {
+        switch kind {
+        case .standard:
+            return escapeToSkipLabel
+        default:
+            return localized(chinese: "ESC 提前结束", english: "ESC to end early")
+        }
     }
 
     public var settingsTitle: String {
@@ -136,6 +171,10 @@ public struct AppStrings {
         localized(chinese: "最近记录", english: "Recent Sessions")
     }
 
+    public var longBreaksTitle: String {
+        localized(chinese: "长休息", english: "Long Breaks")
+    }
+
     public func sessionCountLabel(_ count: Int) -> String {
         switch language {
         case .chinese:
@@ -165,8 +204,34 @@ public struct AppStrings {
         localized(chinese: "立即休息", english: "Break Now")
     }
 
+    public func breakPresetTitle(_ kind: BreakKind) -> String {
+        switch kind {
+        case .standard:
+            return localized(chinese: "普通休息", english: "Break")
+        case .meal:
+            return localized(chinese: "用餐", english: "Meal")
+        case .gym:
+            return localized(chinese: "健身", english: "Gym")
+        case .nap:
+            return localized(chinese: "小憩", english: "Nap")
+        case .errand:
+            return localized(chinese: "外出", english: "Errand")
+        case .desk:
+            return localized(chinese: "桌前休息", english: "Desk break")
+        }
+    }
+
     public var skipCurrentBreakButton: String {
         localized(chinese: "跳过本次休息", english: "Skip Break")
+    }
+
+    public func endBreakButton(for kind: BreakKind) -> String {
+        switch kind {
+        case .standard:
+            return skipCurrentBreakButton
+        default:
+            return localized(chinese: "提前结束休息", english: "End Break Early")
+        }
     }
 
     public var resetTimerButton: String {
@@ -185,6 +250,32 @@ public struct AppStrings {
         localized(chinese: "按 ESC 跳过本次休息", english: "Press ESC to skip this break")
     }
 
+    public func activeBreakTitle(for kind: BreakKind) -> String {
+        switch kind {
+        case .standard:
+            return breakTimeTitle
+        case .meal:
+            return localized(chinese: "用餐时间", english: "Meal Break")
+        case .gym:
+            return localized(chinese: "健身时间", english: "Gym Break")
+        case .nap:
+            return localized(chinese: "小憩时间", english: "Nap Break")
+        case .errand:
+            return localized(chinese: "外出时间", english: "Errand Break")
+        case .desk:
+            return localized(chinese: "桌前休息", english: "Desk Break")
+        }
+    }
+
+    public func pressEscapeToEndBreak(for kind: BreakKind) -> String {
+        switch kind {
+        case .standard:
+            return pressEscapeToSkipBreak
+        default:
+            return localized(chinese: "按 ESC 提前结束休息", english: "Press ESC to end this break early")
+        }
+    }
+
     public var extendBreakOneMinuteButton: String {
         localized(chinese: "延长休息 1 分钟", english: "Break +1m")
     }
@@ -193,15 +284,61 @@ public struct AppStrings {
         localized(chinese: "延长休息 5 分钟", english: "Break +5m")
     }
 
+    public func extendBreakButton(minutes: Int) -> String {
+        switch language {
+        case .chinese:
+            return "延长 \(minutes) 分钟"
+        case .english:
+            return "Break +\(minutes)m"
+        }
+    }
+
+    public func breakCompletedNotificationTitle(for kind: BreakKind) -> String {
+        switch kind {
+        case .desk:
+            return localized(chinese: "桌前休息结束", english: "Desk break finished")
+        case .standard:
+            return localized(chinese: "休息结束", english: "Break finished")
+        case .meal:
+            return localized(chinese: "用餐休息结束", english: "Meal break finished")
+        case .gym:
+            return localized(chinese: "健身休息结束", english: "Gym break finished")
+        case .nap:
+            return localized(chinese: "小憩结束", english: "Nap break finished")
+        case .errand:
+            return localized(chinese: "外出休息结束", english: "Errand break finished")
+        }
+    }
+
+    public func breakCompletedNotificationBody(for kind: BreakKind) -> String {
+        switch kind {
+        case .desk:
+            return localized(chinese: "Rhythm 已恢复专注计时。", english: "Rhythm has resumed focus time.")
+        case .standard, .meal, .gym, .nap, .errand:
+            return localized(chinese: "Rhythm 已恢复专注计时。", english: "Rhythm has resumed focus time.")
+        }
+    }
+
     public func compactDurationLabel(_ seconds: Int) -> String {
         let normalizedSeconds = max(0, seconds)
+        let hours = normalizedSeconds / 3_600
         let minutes = normalizedSeconds / 60
+        let remainingMinutes = (normalizedSeconds % 3_600) / 60
         let remainingSeconds = normalizedSeconds % 60
 
         switch language {
         case .chinese:
             if normalizedSeconds < 60 {
                 return "\(normalizedSeconds) 秒"
+            }
+            if hours > 0 {
+                if remainingMinutes == 0, remainingSeconds == 0 {
+                    return "\(hours) 小时"
+                }
+                if remainingSeconds == 0 {
+                    return "\(hours)小时\(remainingMinutes)分"
+                }
+                return "\(hours)小时\(remainingMinutes)分\(remainingSeconds)秒"
             }
             if remainingSeconds == 0 {
                 return "\(minutes) 分钟"
@@ -210,6 +347,15 @@ public struct AppStrings {
         case .english:
             if normalizedSeconds < 60 {
                 return "\(normalizedSeconds) sec"
+            }
+            if hours > 0 {
+                if remainingMinutes == 0, remainingSeconds == 0 {
+                    return "\(hours) hr"
+                }
+                if remainingSeconds == 0 {
+                    return "\(hours)h \(remainingMinutes)m"
+                }
+                return "\(hours)h \(remainingMinutes)m \(remainingSeconds)s"
             }
             if remainingSeconds == 0 {
                 return "\(minutes) min"
@@ -229,9 +375,15 @@ public struct AppStrings {
     }
 
     public func countdownLabel(seconds: Int) -> String {
-        let minute = max(0, seconds) / 60
-        let second = max(0, seconds) % 60
-        return String(format: "%02d:%02d", minute, second)
+        let normalizedSeconds = max(0, seconds)
+        let hours = normalizedSeconds / 3_600
+        let minutes = (normalizedSeconds % 3_600) / 60
+        let seconds = normalizedSeconds % 60
+
+        if hours > 0 {
+            return String(format: "%01d:%02d:%02d", hours, minutes, seconds)
+        }
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 
     private func localized(chinese: String, english: String) -> String {

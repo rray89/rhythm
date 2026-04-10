@@ -6,15 +6,14 @@ import SwiftUI
 final class OverlayManager: ObservableObject {
     @Published private(set) var remainingSeconds: Int = 0
     @Published private(set) var isShowing: Bool = false
+    @Published private(set) var activeBreakKind: BreakKind = .standard
 
     var onSkipped: (() -> Void)?
-    var onCompleted: (() -> Void)?
+    var onExtendRequested: ((Int) -> Void)?
 
     private var overlayWindow: OverlayWindow?
     private var keyMonitor: Any?
-    private var countdownTimer: Timer?
     private var focusEnforcerTimer: Timer?
-    private var restEndAt: Date?
     private var shownAt: Date?
     private let debugOverlay = ProcessInfo.processInfo.environment["RHYTHM_OVERLAY_DEBUG"] == "1"
     private var originalActivationPolicy: NSApplication.ActivationPolicy?
@@ -24,22 +23,22 @@ final class OverlayManager: ObservableObject {
         self.settingsStore = settingsStore
     }
 
-    func present(restSeconds: Int) {
+    func present(restSeconds: Int, breakKind: BreakKind) {
         dismiss()
+
+        remainingSeconds = max(1, restSeconds)
+        shownAt = Date()
+        activeBreakKind = breakKind
+
+        guard breakKind.usesBlockingOverlay else { return }
 
         let screenFrame = (activeScreen() ?? NSScreen.main ?? NSScreen.screens.first)?.frame
             ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-
-        remainingSeconds = max(1, restSeconds)
-        restEndAt = Date().addingTimeInterval(TimeInterval(restSeconds))
-        shownAt = Date()
         isShowing = true
 
         let contentView = OverlayView(
             model: self,
             settingsStore: settingsStore,
-            extendOneMinuteAction: { [weak self] in self?.extendRest(by: 60) },
-            extendFiveMinutesAction: { [weak self] in self?.extendRest(by: 300) },
             skipAction: { [weak self] in self?.skipByEscape() }
         )
 
@@ -89,34 +88,15 @@ final class OverlayManager: ObservableObject {
         }
 
         startFocusEnforcer()
-
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.tick()
-            }
-        }
-        RunLoop.main.add(countdownTimer!, forMode: .common)
     }
 
-    func extendRest(by seconds: Int) {
-        guard isShowing, seconds > 0 else { return }
-
-        if let restEndAt {
-            self.restEndAt = restEndAt.addingTimeInterval(TimeInterval(seconds))
-        } else {
-            self.restEndAt = Date().addingTimeInterval(TimeInterval(seconds))
-        }
-
-        remainingSeconds = max(1, remainingSeconds + seconds)
-        log("extend rest by \(seconds)s remaining=\(remainingSeconds)")
+    func updateRemaining(restSeconds: Int) {
+        remainingSeconds = max(0, restSeconds)
     }
 
     func dismiss() {
-        countdownTimer?.invalidate()
-        countdownTimer = nil
         focusEnforcerTimer?.invalidate()
         focusEnforcerTimer = nil
-        restEndAt = nil
         shownAt = nil
 
         if let keyMonitor {
@@ -134,6 +114,7 @@ final class OverlayManager: ObservableObject {
 
         isShowing = false
         remainingSeconds = 0
+        activeBreakKind = .standard
         log("dismiss")
     }
 
@@ -146,17 +127,6 @@ final class OverlayManager: ObservableObject {
         log("skip by esc")
         dismiss()
         onSkipped?()
-    }
-
-    private func tick() {
-        guard let restEndAt else { return }
-        let nextRemaining = max(0, Int(ceil(restEndAt.timeIntervalSinceNow)))
-        remainingSeconds = nextRemaining
-
-        if nextRemaining == 0 {
-            dismiss()
-            onCompleted?()
-        }
     }
 
     private func startFocusEnforcer() {
@@ -207,12 +177,14 @@ final class OverlayManager: ObservableObject {
 private struct OverlayView: View {
     @ObservedObject var model: OverlayManager
     @ObservedObject var settingsStore: SettingsStore
-    let extendOneMinuteAction: () -> Void
-    let extendFiveMinutesAction: () -> Void
     let skipAction: () -> Void
 
     private var strings: AppStrings {
         AppStrings(language: settingsStore.effectiveAppLanguage)
+    }
+
+    private var extensionMinutes: [Int] {
+        model.activeBreakKind.extensionMinutes
     }
 
     var body: some View {
@@ -220,31 +192,27 @@ private struct OverlayView: View {
             Color.black.opacity(0.55)
                 .ignoresSafeArea()
             VStack(spacing: 16) {
-                Text(strings.breakTimeTitle)
+                Text(strings.activeBreakTitle(for: model.activeBreakKind))
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                Text(Self.format(model.remainingSeconds))
+                Text(strings.countdownLabel(seconds: model.remainingSeconds))
                     .font(.system(size: 64, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
                     .monospacedDigit()
-                Text(strings.pressEscapeToSkipBreak)
+                Text(strings.pressEscapeToEndBreak(for: model.activeBreakKind))
                     .font(.system(size: 20, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.9))
                 HStack(spacing: 12) {
-                    Button(strings.extendBreakOneMinuteButton) {
-                        extendOneMinuteAction()
+                    ForEach(extensionMinutes, id: \.self) { minutes in
+                        Button(strings.extendBreakButton(minutes: minutes)) {
+                            model.onExtendRequested?(minutes * 60)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.white.opacity(0.22))
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.white.opacity(0.22))
-
-                    Button(strings.extendBreakFiveMinutesButton) {
-                        extendFiveMinutesAction()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.white.opacity(0.22))
                 }
 
-                Button(strings.skipCurrentBreakButton) {
+                Button(strings.endBreakButton(for: model.activeBreakKind)) {
                     skipAction()
                 }
                 .keyboardShortcut(.cancelAction)
@@ -254,11 +222,6 @@ private struct OverlayView: View {
         }
     }
 
-    private static func format(_ seconds: Int) -> String {
-        let minute = max(0, seconds) / 60
-        let second = max(0, seconds) % 60
-        return String(format: "%02d:%02d", minute, second)
-    }
 }
 
 private final class OverlayWindow: NSWindow {
