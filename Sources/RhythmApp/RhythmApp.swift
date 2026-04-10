@@ -30,7 +30,10 @@ struct RhythmApp: App {
                 launchAtLoginManager: appModel.launchAtLoginManager
             )
         } label: {
-            RhythmMenuBarLabel()
+            RhythmMenuBarLabel(
+                timerEngine: appModel.timerEngine,
+                settingsStore: appModel.settingsStore
+            )
         }
         .menuBarExtraStyle(.window)
     }

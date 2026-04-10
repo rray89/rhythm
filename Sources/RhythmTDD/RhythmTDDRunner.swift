@@ -159,6 +159,22 @@ struct RhythmTDDRunner {
             return chinese.breakCompletedNotificationBody(for: .desk) == "Rhythm 已恢复专注计时。"
         }
 
+        failures += run("menu bar accessibility labels are localized") {
+            let chinese = AppStrings(language: .chinese)
+            let english = AppStrings(language: .english)
+
+            guard english.menuBarAccessibilityLabel(mode: .focusing, remainingSeconds: 300, breakKind: nil) == "Rhythm, Focus, 05:00 remaining" else {
+                return false
+            }
+            guard chinese.menuBarAccessibilityLabel(mode: .focusing, remainingSeconds: 300, breakKind: nil) == "Rhythm，专注中，剩余 05:00" else {
+                return false
+            }
+            guard english.menuBarAccessibilityLabel(mode: .resting, remainingSeconds: 45, breakKind: .standard) == "Rhythm, On Break, 00:45 remaining" else {
+                return false
+            }
+            return chinese.menuBarAccessibilityLabel(mode: .resting, remainingSeconds: 7_200, breakKind: .desk) == "Rhythm，桌前休息，剩余 2:00:00"
+        }
+
         failures += run("legacy rest sessions decode without a break kind") {
             let json = """
             [
@@ -252,6 +268,41 @@ struct RhythmTDDRunner {
             guard engine.mode == .focusing else { return false }
             guard engine.secondsUntilBreak == 22 else { return false }
             return settings.focusSeconds == 10
+        }
+
+        failures += run("status item countdown follows the active phase") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 925))
+            let settings = FakeSettings(focusSeconds: 10, restSeconds: 4)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            guard engine.statusItemCountdownSeconds == 10 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(3)
+            engine.processTick(now: clock.now)
+            guard engine.mode == .focusing else { return false }
+            guard engine.statusItemCountdownSeconds == 7 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(7)
+            engine.processTick(now: clock.now)
+            guard engine.mode == .resting else { return false }
+            guard engine.statusItemCountdownSeconds == 4 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(2)
+            engine.processTick(now: clock.now)
+            return engine.statusItemCountdownSeconds == 2
         }
 
         failures += run("focus shortening brings the current break earlier") {
