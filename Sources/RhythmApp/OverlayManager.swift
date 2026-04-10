@@ -18,6 +18,11 @@ final class OverlayManager: ObservableObject {
     private var shownAt: Date?
     private let debugOverlay = ProcessInfo.processInfo.environment["RHYTHM_OVERLAY_DEBUG"] == "1"
     private var originalActivationPolicy: NSApplication.ActivationPolicy?
+    private let settingsStore: SettingsStore
+
+    init(settingsStore: SettingsStore) {
+        self.settingsStore = settingsStore
+    }
 
     func present(restSeconds: Int) {
         dismiss()
@@ -32,6 +37,7 @@ final class OverlayManager: ObservableObject {
 
         let contentView = OverlayView(
             model: self,
+            settingsStore: settingsStore,
             extendOneMinuteAction: { [weak self] in self?.extendRest(by: 60) },
             extendFiveMinutesAction: { [weak self] in self?.extendRest(by: 300) },
             skipAction: { [weak self] in self?.skipByEscape() }
@@ -200,40 +206,45 @@ final class OverlayManager: ObservableObject {
 
 private struct OverlayView: View {
     @ObservedObject var model: OverlayManager
+    @ObservedObject var settingsStore: SettingsStore
     let extendOneMinuteAction: () -> Void
     let extendFiveMinutesAction: () -> Void
     let skipAction: () -> Void
+
+    private var strings: AppStrings {
+        AppStrings(language: settingsStore.effectiveAppLanguage)
+    }
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.55)
                 .ignoresSafeArea()
             VStack(spacing: 16) {
-                Text("休息时间")
+                Text(strings.breakTimeTitle)
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                 Text(Self.format(model.remainingSeconds))
                     .font(.system(size: 64, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
                     .monospacedDigit()
-                Text("按 ESC 跳过本次休息")
+                Text(strings.pressEscapeToSkipBreak)
                     .font(.system(size: 20, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.9))
                 HStack(spacing: 12) {
-                    Button("延长休息 1 分钟") {
+                    Button(strings.extendBreakOneMinuteButton) {
                         extendOneMinuteAction()
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.white.opacity(0.22))
 
-                    Button("延长休息 5 分钟") {
+                    Button(strings.extendBreakFiveMinutesButton) {
                         extendFiveMinutesAction()
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.white.opacity(0.22))
                 }
 
-                Button("跳过本次休息") {
+                Button(strings.skipCurrentBreakButton) {
                     skipAction()
                 }
                 .keyboardShortcut(.cancelAction)

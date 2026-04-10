@@ -1,4 +1,5 @@
 import AppKit
+import RhythmCore
 import SwiftUI
 
 struct RhythmMenuBarLabel: View {
@@ -15,6 +16,8 @@ struct RhythmMenuBarLabel: View {
 }
 
 struct RhythmBrandBadge: View {
+    let language: AppLanguage
+
     var body: some View {
         HStack(spacing: 10) {
             ZStack {
@@ -28,7 +31,7 @@ struct RhythmBrandBadge: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Rhythm")
                     .font(.headline)
-                Text("专注与休息节奏")
+                Text(AppStrings(language: language).brandSubtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

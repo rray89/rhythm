@@ -62,6 +62,133 @@ struct RhythmTDDRunner {
             return store.restSeconds == 180
         }
 
+        failures += run("system language resolves chinese only for zh locales") {
+            guard AppLanguage.resolveSystemLanguage(from: ["zh-Hans"]) == .chinese else { return false }
+            guard AppLanguage.resolveSystemLanguage(from: ["zh-Hant"]) == .chinese else { return false }
+            guard AppLanguage.resolveSystemLanguage(from: ["zh-CN"]) == .chinese else { return false }
+            guard AppLanguage.resolveSystemLanguage(from: ["en-US"]) == .english else { return false }
+            guard AppLanguage.resolveSystemLanguage(from: ["ja-JP"]) == .english else { return false }
+            return AppLanguage.resolveSystemLanguage(from: []) == .english
+        }
+
+        failures += run("default app language follows system when no override exists") {
+            let isolated = makeIsolatedDefaults()
+            defer { isolated.defaults.removePersistentDomain(forName: isolated.suiteName) }
+
+            let chineseStore = SettingsStore(
+                userDefaults: isolated.defaults,
+                preferredLanguagesProvider: { ["zh-Hans"] }
+            )
+            guard chineseStore.appLanguageOverride == nil else { return false }
+            guard chineseStore.effectiveAppLanguage == .chinese else { return false }
+
+            let englishStore = SettingsStore(
+                userDefaults: isolated.defaults,
+                preferredLanguagesProvider: { ["fr-FR"] }
+            )
+            return englishStore.effectiveAppLanguage == .english
+        }
+
+        failures += run("app language override persists across reloads") {
+            let isolated = makeIsolatedDefaults()
+            defer { isolated.defaults.removePersistentDomain(forName: isolated.suiteName) }
+
+            let store = SettingsStore(
+                userDefaults: isolated.defaults,
+                preferredLanguagesProvider: { ["ja-JP"] }
+            )
+            guard store.effectiveAppLanguage == .english else { return false }
+
+            store.appLanguageOverride = .chinese
+            guard store.effectiveAppLanguage == .chinese else { return false }
+
+            let reloadedChinese = SettingsStore(
+                userDefaults: isolated.defaults,
+                preferredLanguagesProvider: { ["en-US"] }
+            )
+            guard reloadedChinese.appLanguageOverride == .chinese else { return false }
+            guard reloadedChinese.effectiveAppLanguage == .chinese else { return false }
+
+            reloadedChinese.appLanguageOverride = .english
+            let reloadedEnglish = SettingsStore(
+                userDefaults: isolated.defaults,
+                preferredLanguagesProvider: { ["zh-Hans"] }
+            )
+            return reloadedEnglish.effectiveAppLanguage == .english
+        }
+
+        failures += run("app language override does not trigger timer settings callback") {
+            let isolated = makeIsolatedDefaults()
+            defer { isolated.defaults.removePersistentDomain(forName: isolated.suiteName) }
+
+            let store = SettingsStore(
+                userDefaults: isolated.defaults,
+                preferredLanguagesProvider: { ["en-US"] }
+            )
+            var callbackCount = 0
+            store.onDidChange = {
+                callbackCount += 1
+            }
+
+            store.appLanguageOverride = .chinese
+            store.appLanguageOverride = .english
+
+            return callbackCount == 0
+        }
+
+        failures += run("localized duration labels support chinese and english") {
+            let chinese = AppStrings(language: .chinese)
+            let english = AppStrings(language: .english)
+
+            guard chinese.breakDurationValue(30) == "30 秒" else { return false }
+            guard chinese.breakDurationValue(60) == "1 分钟" else { return false }
+            guard chinese.breakDurationValue(90) == "1分30秒" else { return false }
+            guard english.breakDurationValue(30) == "30 sec" else { return false }
+            guard english.breakDurationValue(60) == "1 min" else { return false }
+            return english.breakDurationValue(90) == "1m 30s"
+        }
+
+        failures += run("localized session labels support chinese and english") {
+            let session = RestSession(
+                scheduledRestSeconds: 60,
+                actualRestSeconds: 15,
+                startedAt: Date(timeIntervalSince1970: 100),
+                endedAt: Date(timeIntervalSince1970: 115),
+                skipped: true,
+                skipReason: "esc"
+            )
+            let noRestSession = RestSession(
+                scheduledRestSeconds: 60,
+                actualRestSeconds: 0,
+                startedAt: Date(timeIntervalSince1970: 200),
+                endedAt: Date(timeIntervalSince1970: 200),
+                skipped: true,
+                skipReason: "no_rest"
+            )
+            let chinese = AppStrings(language: .chinese)
+            let english = AppStrings(language: .english)
+
+            guard chinese.sessionResultLabel(for: session) == "跳过 00:15" else { return false }
+            guard english.sessionResultLabel(for: session) == "Skipped 00:15" else { return false }
+            guard chinese.sessionResultLabel(for: noRestSession) == "不休息 00:00" else { return false }
+            guard english.sessionResultLabel(for: noRestSession) == "No rest 00:00" else { return false }
+            guard chinese.sessionCountLabel(3) == "3 次" else { return false }
+            guard english.sessionCountLabel(3) == "3 sessions" else { return false }
+            return english.noSessionsYet == "No sessions yet"
+        }
+
+        failures += run("launch at login status messages are bilingual") {
+            let chinese = AppStrings(language: .chinese)
+            let english = AppStrings(language: .english)
+
+            guard chinese.launchAtLoginStatus(.setFailed) == "开机启动设置失败，请稍后重试" else { return false }
+            guard english.launchAtLoginStatus(.setFailed) == "Could not update launch-at-login. Please try again." else { return false }
+            guard chinese.launchAtLoginStatus(.moveToApplicationsRequired) == "请先将 Rhythm 放到“应用程序”后，再开启开机启动" else {
+                return false
+            }
+            return english.launchAtLoginStatus(.approvalRequired) == "Requested. Please allow it in System Settings > Login Items."
+        }
+
         failures += run("focus extension stacks without changing defaults") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 900))
             let settings = FakeSettings(focusSeconds: 10, restSeconds: 5)

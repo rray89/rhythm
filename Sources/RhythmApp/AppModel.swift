@@ -13,7 +13,7 @@ final class AppModel: ObservableObject {
     init() {
         let settingsStore = SettingsStore()
         let sessionStore = SessionStore()
-        let overlayManager = OverlayManager()
+        let overlayManager = OverlayManager(settingsStore: settingsStore)
         let lockMonitor = LockMonitor()
         let launchAtLoginManager = LaunchAtLoginManager()
 
