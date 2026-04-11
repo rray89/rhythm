@@ -52,6 +52,7 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - `Desk break` is the single explicit on-screen non-work break action in the menu
    - `Desk break` is intentionally non-blocking and continues in the menu without forcing a full-screen overlay
    - screen lock now counts as hidden away-from-screen rest until unlock, then starts a fresh focus cycle
+   - app-off time after normal quit or shutdown is counted as hidden rest on next launch, with a 15-minute heartbeat fallback for unclean exits and a 12-hour cap per gap
    - local history now stores focus and rest sessions in weekly JSON folders under Application Support
 8. Daily totals are now part of the shipped menu baseline:
    - the menu shows today's focus and rest totals
@@ -165,6 +166,18 @@ Current behavior:
 
 This better matches "I left my desk" behavior without requiring extra break presets.
 
+### 5.5 App-Off Rest Recovery
+
+The shipped fork also treats app-off time as hidden rest so daily totals do not lose time when the user quits Rhythm or shuts down the Mac.
+
+Current behavior:
+
+- normal quit and expected macOS termination paths record an exact exit timestamp
+- on the next launch, the exit-to-launch gap is recorded as hidden app-downtime rest
+- a 15-minute heartbeat provides a fallback estimate for unclean exits such as force-quit, crash, or power loss
+- each single app-off gap is capped at 12 hours; time beyond the cap is not shown as a special blank in the 7-day aggregate trend
+- app-downtime rest counts in Today totals and the 7-day trend, but stays out of Recent Sessions
+
 ## 6. Non-Goals
 
 This V2 draft still does not aim to add the following right away:
@@ -188,6 +201,7 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 8. `Desk break` can continue without a blocking overlay
 9. Daily totals stay compact in the menu while still showing a minimal 7-day trend
 10. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
+11. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
 
 ## 8. Open Questions
 

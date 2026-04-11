@@ -339,6 +339,168 @@ struct RhythmTDDRunner {
             return store.sessions.isEmpty
         }
 
+        failures += run("app downtime recovery from clean exit is hidden and counted") {
+            let tempDirectory = makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+            let lifecycleStore = AppLifecycleStore(baseDirectoryURL: tempDirectory)
+            let sessionStore = SessionStore(baseDirectoryURL: tempDirectory, calendar: makeUTCCalendar())
+            let exitAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 18, minute: 0)
+            let launchedAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 18, minute: 30)
+
+            lifecycleStore.recordCleanExit(at: exitAt)
+            lifecycleStore.recoverPreviousRun(at: launchedAt, sessionStore: sessionStore)
+
+            guard sessionStore.restSessions.count == 1 else { return false }
+            guard sessionStore.sessions.isEmpty else { return false }
+            guard sessionStore.restSessions[0].source == .appDowntime else { return false }
+            guard sessionStore.restSessions[0].actualRestSeconds == 1_800 else { return false }
+            guard lifecycleStore.loadState() == nil else { return false }
+
+            let summary = sessionStore.summary(activePhase: nil, dayBoundaryHour: 0, now: launchedAt)
+            return summary.restSeconds == 1_800
+        }
+
+        failures += run("clean exit marker wins over heartbeat recovery") {
+            let tempDirectory = makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+            let lifecycleStore = AppLifecycleStore(baseDirectoryURL: tempDirectory)
+            let sessions = FakeSessionStore()
+            let focusStartedAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 9, minute: 0)
+            let heartbeatAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 9, minute: 15)
+            let cleanExitAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 10, minute: 0)
+            let launchedAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 11, minute: 0)
+
+            lifecycleStore.recordHeartbeat(at: heartbeatAt, snapshot: TimerLifecycleSnapshot(
+                phase: .focusing,
+                startedAt: focusStartedAt,
+                scheduledSeconds: 3_600,
+                breakKind: nil
+            ))
+            lifecycleStore.recordCleanExit(at: cleanExitAt)
+            lifecycleStore.recoverPreviousRun(at: launchedAt, sessionStore: sessions)
+
+            guard sessions.capturedFocus.isEmpty else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].source == .appDowntime else { return false }
+            return sessions.captured[0].actualRestSeconds == 3_600
+        }
+
+        failures += run("heartbeat recovery records active focus and caps downtime") {
+            let tempDirectory = makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+            let lifecycleStore = AppLifecycleStore(baseDirectoryURL: tempDirectory)
+            let sessions = FakeSessionStore()
+            let focusStartedAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 9, minute: 0)
+            let heartbeatAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 9, minute: 15)
+            let launchedAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 22, minute: 15)
+
+            lifecycleStore.recordHeartbeat(at: heartbeatAt, snapshot: TimerLifecycleSnapshot(
+                phase: .focusing,
+                startedAt: focusStartedAt,
+                scheduledSeconds: 3_600,
+                breakKind: nil
+            ))
+            lifecycleStore.recoverPreviousRun(at: launchedAt, sessionStore: sessions)
+
+            guard AppLifecycleStore.heartbeatIntervalSeconds == 900 else { return false }
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .appExit else { return false }
+            guard sessions.capturedFocus[0].actualFocusSeconds == 900 else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].source == .appDowntime else { return false }
+            return sessions.captured[0].actualRestSeconds == AppLifecycleStore.maximumDowntimeSeconds
+        }
+
+        failures += run("prepare for app exit records current focus") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 3_000))
+            let settings = FakeSettings(focusSeconds: 20, restSeconds: 5)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(5)
+            engine.prepareForAppExit(at: clock.now)
+
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .appExit else { return false }
+            guard sessions.capturedFocus[0].actualFocusSeconds == 5 else { return false }
+            return sessions.captured.isEmpty
+        }
+
+        failures += run("prepare for app exit closes active rest") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 4_000))
+            let settings = FakeSettings(focusSeconds: 8, restSeconds: 20)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(8)
+            engine.processTick(now: clock.now)
+            clock.now = clock.now.addingTimeInterval(2)
+            engine.prepareForAppExit(at: clock.now)
+
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .scheduledBreak else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].source == .timer else { return false }
+            return sessions.captured[0].actualRestSeconds == 2
+        }
+
+        failures += run("prepare for app exit closes screen lock rest") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 5_000))
+            let settings = FakeSettings(focusSeconds: 20, restSeconds: 5)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(5)
+            lock.fireLock()
+            clock.now = clock.now.addingTimeInterval(60)
+            engine.prepareForAppExit(at: clock.now)
+
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .screenLock else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].source == .screenLock else { return false }
+            return sessions.captured[0].actualRestSeconds == 60
+        }
+
         failures += run("launch at login status messages are bilingual") {
             let chinese = AppStrings(language: .chinese)
             let english = AppStrings(language: .english)

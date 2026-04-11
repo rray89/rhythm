@@ -10,9 +10,13 @@ final class AppModel: ObservableObject {
     let overlayManager: OverlayManager
     let launchAtLoginManager: LaunchAtLoginManager
 
+    private let appLifecycleStore: AppLifecycleStore
+    private var heartbeatTimer: Timer?
+
     init() {
         let settingsStore = SettingsStore()
         let sessionStore = SessionStore()
+        let appLifecycleStore = AppLifecycleStore()
         let overlayManager = OverlayManager(settingsStore: settingsStore)
         let lockMonitor = LockMonitor()
         let launchAtLoginManager = LaunchAtLoginManager()
@@ -20,6 +24,7 @@ final class AppModel: ObservableObject {
 
         self.settingsStore = settingsStore
         self.sessionStore = sessionStore
+        self.appLifecycleStore = appLifecycleStore
         self.overlayManager = overlayManager
         self.launchAtLoginManager = launchAtLoginManager
         self.timerEngine = TimerEngine(
@@ -27,10 +32,40 @@ final class AppModel: ObservableObject {
             sessionStore: sessionStore,
             overlayManager: overlayManager,
             lockMonitor: lockMonitor,
-            breakNotifier: breakNotificationManager
+            breakNotifier: breakNotificationManager,
+            autoStart: false
         )
 
+        appLifecycleStore.recoverPreviousRun(at: Date(), sessionStore: sessionStore)
+        timerEngine.onLifecycleStateChanged = { [weak self] in
+            self?.recordLifecycleHeartbeat()
+        }
+        timerEngine.start()
+        startHeartbeatTimer()
         runOverlaySmokeIfNeeded()
+    }
+
+    func prepareForAppTermination() {
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = nil
+
+        let now = Date()
+        timerEngine.prepareForAppExit(at: now)
+        appLifecycleStore.recordCleanExit(at: now)
+    }
+
+    private func startHeartbeatTimer() {
+        let timer = Timer(timeInterval: TimeInterval(AppLifecycleStore.heartbeatIntervalSeconds), repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.recordLifecycleHeartbeat()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        heartbeatTimer = timer
+    }
+
+    private func recordLifecycleHeartbeat() {
+        appLifecycleStore.recordHeartbeat(at: Date(), snapshot: timerEngine.lifecycleSnapshot)
     }
 
     private func runOverlaySmokeIfNeeded() {

@@ -1,93 +1,100 @@
 # Rhythm
 
-Rhythm 是一个 macOS 节奏提醒工具，帮助用户建立稳定的「专注-休息」电脑使用节奏。
+**English** | [中文](README.zh.md)
+
+Rhythm is a macOS rhythm reminder app that helps users build a steadier focus-and-break cadence while using their computer.
 
 <img src="assets/rhythm-logo.svg" alt="Rhythm Logo" width="64" />
 
-## 界面预览
+## UI Preview
 
 <img src="assets/menu-panel.png" alt="Rhythm Menu Panel" width="480" />
 
 <img src="assets/rest-overlay.png" alt="Rhythm Rest Overlay" width="480" />
 
-## 文档说明
+## Docs
 
-本 README 描述当前 fork 已落地的产品行为；如果你想区分上游 V1 基线与 fork 的后续方向，请同时参考以下文档：
+This README describes the behavior currently shipped in this fork. If you want to separate the upstream V1 baseline from the fork's next direction, use these docs together:
 
-- [V1 设计文档](docs/V1-design.md)：上游 `main` 的 V1 基线与历史设计记录
-- [V2 PRD（中文 / Fork 草案）](docs/V2-prd.zh.md)：fork 当前基线与下一阶段方向
+- [Chinese README](README.zh.md): Chinese version of the shipped README
+- [V1 Design Doc](docs/V1-design.md): historical upstream `main` baseline and design record
+- [V2 PRD (Chinese / Fork Draft)](docs/V2-prd.zh.md): current fork baseline and next-stage direction
 - [V2 PRD (English / Fork Draft)](docs/V2-prd.en.md): English companion version of the fork baseline and roadmap
 
-## 当前功能
+## Current Features
 
-- 自定义节奏：可设置专注间隔（10-120 分钟，5 分钟步进）和休息时长（30 秒-20 分钟，常用档位）
-- Phase 临时控制：支持 `提前休息 5 分钟`、`延长专注 5 分钟`、`延长专注 10 分钟`，以及当前休息阶段延长
-- 中英双语：支持 `中文` / `English` 界面切换；首次使用时，`zh*` 系统语言默认中文，其他语言默认英文
-- 每日总量：菜单中展示当日 `专注` / `休息` 总量，以及过去 7 天的双色趋势柱图
-- 日切换点：可在设置中把“今天”的统计分界点调到 `00:00`-`23:00`
-- 不休息模式：可开启“不休息”，到点自动跳过并记录本次应休息会话
-- 锁屏离屏休息：锁屏会结束当前专注或休息片段，并把锁定到解锁之间的时间记为离屏休息；解锁后自动开始新的专注周期
-- 桌前休息：菜单中提供单独的 `桌前休息` 快捷动作，用于“继续用电脑但不工作”的休息场景
-- 休息呈现分层：
-  - 普通休息使用全屏半透明遮罩，支持 `ESC` 提前结束
-  - `桌前休息` 不锁屏，可继续使用 Mac，倒计时在菜单中继续，结束后自动恢复专注并尝试发送通知
-- 数据记录：保存专注 / 休息片段、计划时长、实际时长、结束原因，并按周写入本地 `Application Support/Rhythm/history/weeks/` JSON 历史目录
-- 菜单栏应用：常驻状态栏，保留图标并实时显示当前倒计时，快速查看状态与最近记录
-- 开机启动：支持在菜单中开启/关闭登录时启动（打包安装后可用）
+- Custom rhythm: configurable focus interval from 10 to 120 minutes in 5-minute steps, plus configurable break duration from 30 seconds to 20 minutes using common presets
+- Temporary phase controls: supports `Start Break 5 Minutes Early`, `Extend Focus 5 Minutes`, `Extend Focus 10 Minutes`, and extending the current break phase
+- Bilingual UI: supports `中文` and `English`; first launch defaults to Chinese only for `zh*` system languages, and English otherwise
+- Daily totals: the menu shows today's `Focus` and `Rest` totals plus a two-color 7-day trend bar chart
+- Day cutoff: reporting for "today" can be shifted anywhere from `00:00` to `23:00`
+- No-rest mode: automatically skips breaks when enabled and records the skipped break session
+- Hidden screen-lock rest: locking the screen ends the current focus or break segment, counts lock-to-unlock time as rest, and starts a fresh focus cycle on unlock
+- Hidden app-off rest: normal quit or shutdown records the close time, then the next launch counts that gap as hidden rest; a 15-minute heartbeat provides fallback recovery for unclean exits, capped at 12 hours per gap
+- Desk break: the menu provides a dedicated `Desk break` action for "still on the computer, but not working" scenarios
+- Layered break presentation:
+  - regular breaks use a full-screen translucent overlay and can be ended early with `ESC`
+  - `Desk break` stays non-blocking, keeps the Mac usable, continues counting down in the menu, and automatically returns to focus with a completion notification when possible
+- Local history: focus and rest sessions, planned durations, actual durations, and end reasons are stored in weekly JSON history under `Application Support/Rhythm/history/weeks/`; app-off recovery state lives in `Application Support/Rhythm/state/app-lifecycle.json`
+- Menu bar app: stays in the status bar, keeps the icon visible, and shows a live countdown for quick status checks and recent history
+- Launch at login: can be enabled or disabled from the menu after the app is installed normally
 
-## 技术栈
+## Tech Stack
 
 - Swift 6
 - SwiftUI + AppKit
 - Swift Package Manager
 
-## 本地运行
+## Run Locally
 
 ```bash
 swift build
 swift run Rhythm
 ```
 
-> 注意：需要在 macOS 环境运行。首次运行可能需要在系统设置中允许应用窗口置顶或辅助功能能力（取决于系统策略）。
+> Note: this must run on macOS. On first launch, the system may ask for permissions related to always-on-top windows or accessibility depending on macOS behavior.
 
-## TDD 回归检查
+## TDD Regression Checks
 
 ```bash
 swift run RhythmTDD
 ```
 
-该命令会执行一组可重复的回归检查，覆盖：
+This command runs repeatable regression coverage for:
 
-- 设置变更回调、范围归一化与历史配置迁移
-- 中英双语解析、持久化与文案格式化
-- 专注 / 休息 history、周目录迁移与每日总量统计
-- 跳过休息与 `桌前休息` 的 session 记录
-- 锁屏离屏休息与解锁后新专注周期
-- 休息遮罩可见性与焦点（自动 smoke）
+- settings callbacks, range normalization, and legacy settings migration
+- Chinese and English language resolution, persistence, and string formatting
+- focus and rest history, weekly folder migration, and daily totals
+- skipped breaks and `Desk break` session recording
+- hidden screen-lock rest and fresh focus after unlock
+- hidden app-off rest, heartbeat fallback recovery, and the 12-hour cap
+- overlay visibility and focus smoke coverage
 
-如需临时跳过 UI 集成 smoke：
+To temporarily skip the UI smoke coverage:
 
 ```bash
 RHYTHM_TDD_UI=0 swift run RhythmTDD
 ```
 
-手动跑遮罩 smoke（默认仅输出 smoke 流程日志）：
+To run the overlay smoke manually:
 
 ```bash
 RHYTHM_SMOKE_OVERLAY=1 swift run Rhythm
 ```
 
-如需输出遮罩焦点细节日志，再加：
+To include the overlay focus detail logs as well:
 
 ```bash
 RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
 ```
 
-## 项目结构
+## Project Structure
 
 ```txt
 .
 ├── AGENTS.md
+├── README.md
+├── README.zh.md
 ├── docs/
 │   ├── V1-design.md
 │   ├── V2-prd.zh.md
@@ -104,6 +111,7 @@ RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
 │   │   ├── RhythmBrand.swift
 │   │   └── RhythmApp.swift
 │   ├── RhythmCore/
+│   │   ├── AppLifecycleStore.swift
 │   │   ├── BreakKind.swift
 │   │   ├── Localization.swift
 │   │   ├── Persistence.swift
@@ -113,13 +121,13 @@ RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
 └── Package.swift
 ```
 
-## 开源
+## Open Source
 
 - License: MIT
-- 欢迎通过 Issue / PR 贡献
+- Contributions via Issues and PRs are welcome
 
-## 品牌资产
+## Brand Assets
 
-- Logo 源文件：`assets/rhythm-logo.svg`
-- 面板截图：`assets/menu-panel.png`
-- 休息提醒截图：`assets/rest-overlay.png`
+- Logo source: `assets/rhythm-logo.svg`
+- Panel screenshot: `assets/menu-panel.png`
+- Break overlay screenshot: `assets/rest-overlay.png`

@@ -1,9 +1,19 @@
+import AppKit
 import RhythmCore
 import SwiftUI
 
+@MainActor
+final class RhythmAppDelegate: NSObject, NSApplicationDelegate {
+    let appModel = AppModel()
+
+    func applicationWillTerminate(_ notification: Notification) {
+        appModel.prepareForAppTermination()
+    }
+}
+
 @main
 struct RhythmApp: App {
-    @StateObject private var appModel = AppModel()
+    @NSApplicationDelegateAdaptor(RhythmAppDelegate.self) private var appDelegate
     @State private var isMenuBarExtraInserted = true
 
     private var menuBarInsertionBinding: Binding<Bool> {
@@ -24,15 +34,15 @@ struct RhythmApp: App {
     var body: some Scene {
         MenuBarExtra(isInserted: menuBarInsertionBinding) {
             MenuBarView(
-                timerEngine: appModel.timerEngine,
-                settingsStore: appModel.settingsStore,
-                sessionStore: appModel.sessionStore,
-                launchAtLoginManager: appModel.launchAtLoginManager
+                timerEngine: appDelegate.appModel.timerEngine,
+                settingsStore: appDelegate.appModel.settingsStore,
+                sessionStore: appDelegate.appModel.sessionStore,
+                launchAtLoginManager: appDelegate.appModel.launchAtLoginManager
             )
         } label: {
             RhythmMenuBarLabel(
-                timerEngine: appModel.timerEngine,
-                settingsStore: appModel.settingsStore
+                timerEngine: appDelegate.appModel.timerEngine,
+                settingsStore: appDelegate.appModel.settingsStore
             )
         }
         .menuBarExtraStyle(.window)
