@@ -1,6 +1,46 @@
 import Foundation
 
-public struct RestSession: Codable, Identifiable {
+public enum RestSessionSource: String, Codable, Sendable {
+    case timer
+    case screenLock
+}
+
+public enum FocusEndReason: String, Codable, Sendable {
+    case scheduledBreak
+    case manualBreak
+    case reset
+    case screenLock
+}
+
+public struct FocusSession: Codable, Identifiable, Sendable {
+    public let id: UUID
+    public let scheduledFocusSeconds: Int
+    public let actualFocusSeconds: Int
+    public let startedAt: Date
+    public let endedAt: Date
+    public let endReason: FocusEndReason
+    public let createdAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        scheduledFocusSeconds: Int,
+        actualFocusSeconds: Int,
+        startedAt: Date,
+        endedAt: Date,
+        endReason: FocusEndReason,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.scheduledFocusSeconds = scheduledFocusSeconds
+        self.actualFocusSeconds = actualFocusSeconds
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.endReason = endReason
+        self.createdAt = createdAt
+    }
+}
+
+public struct RestSession: Codable, Identifiable, Sendable {
     public let id: UUID
     public let breakKind: BreakKind
     public let scheduledRestSeconds: Int
@@ -9,6 +49,7 @@ public struct RestSession: Codable, Identifiable {
     public let endedAt: Date
     public let skipped: Bool
     public let skipReason: String?
+    public let source: RestSessionSource
     public let createdAt: Date
 
     private enum CodingKeys: String, CodingKey {
@@ -20,6 +61,7 @@ public struct RestSession: Codable, Identifiable {
         case endedAt
         case skipped
         case skipReason
+        case source
         case createdAt
     }
 
@@ -32,6 +74,7 @@ public struct RestSession: Codable, Identifiable {
         endedAt: Date,
         skipped: Bool,
         skipReason: String? = nil,
+        source: RestSessionSource = .timer,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -42,6 +85,7 @@ public struct RestSession: Codable, Identifiable {
         self.endedAt = endedAt
         self.skipped = skipped
         self.skipReason = skipReason
+        self.source = source
         self.createdAt = createdAt
     }
 
@@ -55,6 +99,7 @@ public struct RestSession: Codable, Identifiable {
         endedAt = try container.decode(Date.self, forKey: .endedAt)
         skipped = try container.decode(Bool.self, forKey: .skipped)
         skipReason = try container.decodeIfPresent(String.self, forKey: .skipReason)
+        source = try container.decodeIfPresent(RestSessionSource.self, forKey: .source) ?? .timer
         createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 
@@ -68,62 +113,280 @@ public struct RestSession: Codable, Identifiable {
         try container.encode(endedAt, forKey: .endedAt)
         try container.encode(skipped, forKey: .skipped)
         try container.encodeIfPresent(skipReason, forKey: .skipReason)
+        try container.encode(source, forKey: .source)
         try container.encode(createdAt, forKey: .createdAt)
     }
 }
 
+public struct SessionTimelineEntry: Identifiable, Sendable {
+    public enum Kind: Sendable {
+        case focus(FocusSession)
+        case rest(RestSession)
+    }
+
+    public let kind: Kind
+    public let startedAt: Date
+
+    public var id: String {
+        switch kind {
+        case .focus(let session):
+            return "focus-\(session.id.uuidString)"
+        case .rest(let session):
+            return "rest-\(session.id.uuidString)"
+        }
+    }
+
+    public init(kind: Kind, startedAt: Date) {
+        self.kind = kind
+        self.startedAt = startedAt
+    }
+}
+
+@MainActor
+public protocol SessionRecording: AnyObject {
+    func add(restSession: RestSession)
+    func add(focusSession: FocusSession)
+}
+
 @MainActor
 public final class SessionStore: ObservableObject {
-    @Published public private(set) var sessions: [RestSession] = []
+    public static let legacyRestFileName = "sessions.json"
+    public static let focusSessionsFileName = "focus-sessions.json"
+    public static let restSessionsFileName = "rest-sessions.json"
 
-    private let fileURL: URL
+    @Published public private(set) var sessions: [RestSession] = []
+    @Published public private(set) var restSessions: [RestSession] = []
+    @Published public private(set) var focusSessions: [FocusSession] = []
+    @Published public private(set) var historyEntries: [SessionTimelineEntry] = []
+
+    private let rootDirectoryURL: URL
+    private let weeksDirectoryURL: URL
+    private let legacyRestFileURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let fileManager: FileManager
+    private let calendar: Calendar
 
-    public init() {
-        let fm = FileManager.default
-        let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let directory = appSupport.appendingPathComponent("Rhythm", isDirectory: true)
-        self.fileURL = directory.appendingPathComponent("sessions.json", isDirectory: false)
+    public init(
+        baseDirectoryURL: URL? = nil,
+        fileManager: FileManager = .default,
+        calendar: Calendar = .current
+    ) {
+        self.fileManager = fileManager
+        self.calendar = Self.reportingCalendar(from: calendar)
 
-        if !fm.fileExists(atPath: directory.path) {
-            try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        if let baseDirectoryURL {
+            self.rootDirectoryURL = baseDirectoryURL
+        } else {
+            let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            self.rootDirectoryURL = appSupport.appendingPathComponent("Rhythm", isDirectory: true)
+        }
+
+        let historyDirectoryURL = rootDirectoryURL.appendingPathComponent("history", isDirectory: true)
+        self.weeksDirectoryURL = historyDirectoryURL.appendingPathComponent("weeks", isDirectory: true)
+        self.legacyRestFileURL = rootDirectoryURL.appendingPathComponent(Self.legacyRestFileName, isDirectory: false)
+
+        if !fileManager.fileExists(atPath: weeksDirectoryURL.path) {
+            try? fileManager.createDirectory(at: weeksDirectoryURL, withIntermediateDirectories: true)
         }
 
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         load()
     }
 
-    public func add(_ session: RestSession) {
-        sessions.insert(session, at: 0)
-        save()
+    public func add(restSession: RestSession) {
+        restSessions.insert(restSession, at: 0)
+        rebuildDerivedViews()
+        saveRestSessions()
+    }
+
+    public func add(focusSession: FocusSession) {
+        focusSessions.insert(focusSession, at: 0)
+        rebuildDerivedViews()
+        saveFocusSessions()
+    }
+
+    public func summary(
+        activePhase: ActiveSessionSnapshot?,
+        dayBoundaryHour: Int,
+        now: Date = Date()
+    ) -> DailyTotalsSnapshot {
+        DailyTotalsCalculator.snapshot(
+            focusSessions: focusSessions,
+            restSessions: restSessions,
+            activePhase: activePhase,
+            dayBoundaryHour: dayBoundaryHour,
+            now: now,
+            calendar: calendar
+        )
     }
 
     private func load() {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            sessions = []
+        restSessions = loadRestSessionsFromWeeks().sorted { $0.startedAt > $1.startedAt }
+        focusSessions = loadFocusSessionsFromWeeks().sorted { $0.startedAt > $1.startedAt }
+
+        migrateLegacyRestSessionsIfNeeded()
+        rebuildDerivedViews()
+    }
+
+    private func rebuildDerivedViews() {
+        restSessions.sort { $0.startedAt > $1.startedAt }
+        focusSessions.sort { $0.startedAt > $1.startedAt }
+        sessions = restSessions.filter { $0.source == .timer }
+
+        historyEntries = (
+            focusSessions.map { SessionTimelineEntry(kind: .focus($0), startedAt: $0.startedAt) } +
+            restSessions.map { SessionTimelineEntry(kind: .rest($0), startedAt: $0.startedAt) }
+        )
+        .sorted { $0.startedAt > $1.startedAt }
+    }
+
+    private func migrateLegacyRestSessionsIfNeeded() {
+        guard fileManager.fileExists(atPath: legacyRestFileURL.path) else {
             return
         }
 
-        do {
-            let data = try Data(contentsOf: fileURL)
-            sessions = try decoder.decode([RestSession].self, from: data)
-        } catch {
-            sessions = []
+        guard let legacySessions: [RestSession] = loadJSON([RestSession].self, from: legacyRestFileURL) else {
+            return
+        }
+
+        var mergedByID = Dictionary(uniqueKeysWithValues: restSessions.map { ($0.id, $0) })
+        for session in legacySessions {
+            mergedByID[session.id] = session
+        }
+
+        restSessions = mergedByID.values.sorted { $0.startedAt > $1.startedAt }
+        rebuildDerivedViews()
+        saveRestSessions()
+        try? fileManager.removeItem(at: legacyRestFileURL)
+    }
+
+    private func loadRestSessionsFromWeeks() -> [RestSession] {
+        weekDirectories().compactMap { directory in
+            loadJSON([RestSession].self, from: directory.appendingPathComponent(Self.restSessionsFileName, isDirectory: false))
+        }
+        .flatMap { $0 }
+    }
+
+    private func loadFocusSessionsFromWeeks() -> [FocusSession] {
+        weekDirectories().compactMap { directory in
+            loadJSON([FocusSession].self, from: directory.appendingPathComponent(Self.focusSessionsFileName, isDirectory: false))
+        }
+        .flatMap { $0 }
+    }
+
+    private func saveRestSessions() {
+        removeExistingWeeklyFiles(named: Self.restSessionsFileName)
+
+        let groupedSessions = Dictionary(grouping: restSessions) { weekFolderName(for: $0.startedAt) }
+        for (folderName, sessions) in groupedSessions {
+            let directoryURL = weeksDirectoryURL.appendingPathComponent(folderName, isDirectory: true)
+            if !fileManager.fileExists(atPath: directoryURL.path) {
+                try? fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            }
+
+            let sortedSessions = sessions.sorted { $0.startedAt < $1.startedAt }
+            saveJSON(sortedSessions, to: directoryURL.appendingPathComponent(Self.restSessionsFileName, isDirectory: false))
+        }
+
+        removeEmptyWeekDirectories()
+    }
+
+    private func saveFocusSessions() {
+        removeExistingWeeklyFiles(named: Self.focusSessionsFileName)
+
+        let groupedSessions = Dictionary(grouping: focusSessions) { weekFolderName(for: $0.startedAt) }
+        for (folderName, sessions) in groupedSessions {
+            let directoryURL = weeksDirectoryURL.appendingPathComponent(folderName, isDirectory: true)
+            if !fileManager.fileExists(atPath: directoryURL.path) {
+                try? fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            }
+
+            let sortedSessions = sessions.sorted { $0.startedAt < $1.startedAt }
+            saveJSON(sortedSessions, to: directoryURL.appendingPathComponent(Self.focusSessionsFileName, isDirectory: false))
+        }
+
+        removeEmptyWeekDirectories()
+    }
+
+    private func weekDirectories() -> [URL] {
+        guard let directories = try? fileManager.contentsOfDirectory(
+            at: weeksDirectoryURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        return directories.filter {
+            (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
         }
     }
 
-    private func save() {
-        do {
-            let data = try encoder.encode(sessions)
-            try data.write(to: fileURL, options: .atomic)
-        } catch {
-            // Intentionally swallow write errors in V1 to avoid crashing the menu bar app.
+    private func removeExistingWeeklyFiles(named fileName: String) {
+        for directory in weekDirectories() {
+            let fileURL = directory.appendingPathComponent(fileName, isDirectory: false)
+            if fileManager.fileExists(atPath: fileURL.path) {
+                try? fileManager.removeItem(at: fileURL)
+            }
         }
+    }
+
+    private func removeEmptyWeekDirectories() {
+        for directory in weekDirectories() {
+            let contents = (try? fileManager.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )) ?? []
+
+            if contents.isEmpty {
+                try? fileManager.removeItem(at: directory)
+            }
+        }
+    }
+
+    private func weekFolderName(for date: Date) -> String {
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? calendar.startOfDay(for: date)
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: startOfWeek)
+    }
+
+    private func loadJSON<T: Decodable>(_ type: T.Type, from url: URL) -> T? {
+        guard fileManager.fileExists(atPath: url.path) else {
+            return nil
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            return nil
+        }
+    }
+
+    private func saveJSON<T: Encodable>(_ value: T, to url: URL) {
+        do {
+            let data = try encoder.encode(value)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            // Intentionally swallow write errors to avoid crashing the menu bar app.
+        }
+    }
+
+    private static func reportingCalendar(from base: Calendar) -> Calendar {
+        var calendar = base
+        calendar.firstWeekday = 2
+        calendar.minimumDaysInFirstWeek = 4
+        return calendar
     }
 }
 
-extension SessionStore: RestSessionStoring {}
+extension SessionStore: SessionRecording {}
 
 @MainActor
 public protocol RhythmSettings: AnyObject {
@@ -139,6 +402,7 @@ public final class SettingsStore: ObservableObject {
     public static let restSecondsKey = "restSeconds"
     public static let legacyRestMinutesKey = "restMinutes"
     public static let skipRestEnabledKey = "skipRestEnabled"
+    public static let dayBoundaryHourKey = "dayBoundaryHour"
     public static let appLanguageOverrideKey = "appLanguageOverride"
 
     public static let minFocusMinutes = 10
@@ -148,6 +412,9 @@ public final class SettingsStore: ObservableObject {
     public static let minRestSeconds = 30
     public static let maxRestSeconds = 1_200
     public static let restPresetSeconds = [30, 60, 90, 120, 180, 240, 300, 600, 900, 1_200]
+
+    public static let minDayBoundaryHour = 0
+    public static let maxDayBoundaryHour = 23
 
     @Published public var focusMinutes: Int {
         didSet {
@@ -185,6 +452,21 @@ public final class SettingsStore: ObservableObject {
                 return
             }
             userDefaults.set(skipRestEnabled, forKey: Self.skipRestEnabledKey)
+            onDidChange?()
+        }
+    }
+
+    @Published public var dayBoundaryHour: Int {
+        didSet {
+            let normalized = Self.normalizeDayBoundaryHour(dayBoundaryHour)
+            if dayBoundaryHour != normalized {
+                dayBoundaryHour = normalized
+                return
+            }
+            if oldValue == dayBoundaryHour {
+                return
+            }
+            userDefaults.set(dayBoundaryHour, forKey: Self.dayBoundaryHourKey)
             onDidChange?()
         }
     }
@@ -236,6 +518,12 @@ public final class SettingsStore: ObservableObject {
             self.skipRestEnabled = false
         }
 
+        if let storedDayBoundaryHour = userDefaults.object(forKey: Self.dayBoundaryHourKey) as? Int {
+            self.dayBoundaryHour = Self.normalizeDayBoundaryHour(storedDayBoundaryHour)
+        } else {
+            self.dayBoundaryHour = Self.normalizeDayBoundaryHour(0)
+        }
+
         if let storedAppLanguage = userDefaults.string(forKey: Self.appLanguageOverrideKey) {
             self.appLanguageOverride = AppLanguage(rawValue: storedAppLanguage)
         } else {
@@ -252,6 +540,10 @@ public final class SettingsStore: ObservableObject {
         return restPresetSeconds.min { lhs, rhs in
             abs(lhs - clamped) < abs(rhs - clamped)
         } ?? minRestSeconds
+    }
+
+    private static func normalizeDayBoundaryHour(_ value: Int) -> Int {
+        Swift.max(minDayBoundaryHour, Swift.min(maxDayBoundaryHour, value))
     }
 
     private static func normalize(_ value: Int, min: Int, max: Int, step: Int) -> Int {

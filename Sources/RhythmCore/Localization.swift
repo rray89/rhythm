@@ -101,6 +101,18 @@ public struct AppStrings {
         localized(chinese: "节奏设置", english: "Settings")
     }
 
+    public var todayTitle: String {
+        localized(chinese: "今日总量", english: "Today")
+    }
+
+    public var todayFocusTitle: String {
+        localized(chinese: "专注", english: "Focus")
+    }
+
+    public var todayRestTitle: String {
+        localized(chinese: "休息", english: "Rest")
+    }
+
     public var focusIntervalTitle: String {
         localized(chinese: "专注间隔", english: "Focus")
     }
@@ -141,6 +153,14 @@ public struct AppStrings {
 
     public var launchAtLoginTitle: String {
         localized(chinese: "开机启动", english: "Startup")
+    }
+
+    public var dayCutoffTitle: String {
+        localized(chinese: "日切换点", english: "Day cutoff")
+    }
+
+    public func dayCutoffValue(_ hour: Int) -> String {
+        String(format: "%02d:00", max(0, min(23, hour)))
     }
 
     public func launchAtLoginStatus(_ state: LaunchAtLoginStatusState) -> String {
@@ -202,6 +222,10 @@ public struct AppStrings {
 
     public var startBreakNowButton: String {
         localized(chinese: "立即休息", english: "Break Now")
+    }
+
+    public var deskBreakButton: String {
+        localized(chinese: "桌前休息", english: "Desk break")
     }
 
     public func breakPresetTitle(_ kind: BreakKind) -> String {
@@ -332,6 +356,45 @@ public struct AppStrings {
             return localized(chinese: "Rhythm 已恢复专注计时。", english: "Rhythm has resumed focus time.")
         case .standard, .meal, .gym, .nap, .errand:
             return localized(chinese: "Rhythm 已恢复专注计时。", english: "Rhythm has resumed focus time.")
+        }
+    }
+
+    public func weekdayTrendLabel(_ weekday: Int) -> String {
+        switch language {
+        case .chinese:
+            switch weekday {
+            case 1:
+                return "日"
+            case 2:
+                return "一"
+            case 3:
+                return "二"
+            case 4:
+                return "三"
+            case 5:
+                return "四"
+            case 6:
+                return "五"
+            default:
+                return "六"
+            }
+        case .english:
+            switch weekday {
+            case 1:
+                return "Su"
+            case 2:
+                return "Mo"
+            case 3:
+                return "Tu"
+            case 4:
+                return "We"
+            case 5:
+                return "Th"
+            case 6:
+                return "Fr"
+            default:
+                return "Sa"
+            }
         }
     }
 
