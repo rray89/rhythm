@@ -29,7 +29,8 @@ struct RhythmTDDRunner {
 
             let store = SettingsStore(userDefaults: isolated.defaults)
             guard store.focusMinutes == 30 else { return false }
-            return store.restSeconds == 60
+            guard store.restSeconds == 60 else { return false }
+            return store.dayBoundaryHour == 0
         }
 
         failures += run("settings normalization keeps configured range and rest presets") {
@@ -53,7 +54,13 @@ struct RhythmTDDRunner {
             guard store.restSeconds == 600 else { return false }
 
             store.restSeconds = 1_111
-            return store.restSeconds == 1_200
+            guard store.restSeconds == 1_200 else { return false }
+
+            store.dayBoundaryHour = -5
+            guard store.dayBoundaryHour == 0 else { return false }
+
+            store.dayBoundaryHour = 99
+            return store.dayBoundaryHour == 23
         }
 
         failures += run("legacy rest minutes migrates to rest seconds") {
@@ -156,7 +163,10 @@ struct RhythmTDDRunner {
             guard chinese.breakPresetTitle(.desk) == "桌前休息" else { return false }
             guard english.breakPresetTitle(.desk) == "Desk break" else { return false }
             guard english.breakCompletedNotificationTitle(for: .desk) == "Desk break finished" else { return false }
-            return chinese.breakCompletedNotificationBody(for: .desk) == "Rhythm 已恢复专注计时。"
+            guard chinese.breakCompletedNotificationBody(for: .desk) == "Rhythm 已恢复专注计时。" else { return false }
+            guard chinese.dayCutoffValue(4) == "04:00" else { return false }
+            guard english.weekdayTrendLabel(2) == "Mo" else { return false }
+            return BreakPreset.longBreaks == [.deskBreak]
         }
 
         failures += run("menu bar accessibility labels are localized") {
@@ -175,7 +185,7 @@ struct RhythmTDDRunner {
             return chinese.menuBarAccessibilityLabel(mode: .resting, remainingSeconds: 7_200, breakKind: .desk) == "Rhythm，桌前休息，剩余 2:00:00"
         }
 
-        failures += run("legacy rest sessions decode without a break kind") {
+        failures += run("legacy rest sessions decode without a break kind or source") {
             let json = """
             [
               {
@@ -194,7 +204,8 @@ struct RhythmTDDRunner {
             guard let data = json.data(using: .utf8) else { return false }
             guard let sessions = try? decoder.decode([RestSession].self, from: data) else { return false }
             guard sessions.count == 1 else { return false }
-            return sessions[0].breakKind == .standard
+            guard sessions[0].breakKind == .standard else { return false }
+            return sessions[0].source == .timer
         }
 
         failures += run("localized session labels support chinese and english") {
@@ -224,6 +235,108 @@ struct RhythmTDDRunner {
             guard chinese.sessionCountLabel(3) == "3 次" else { return false }
             guard english.sessionCountLabel(3) == "3 sessions" else { return false }
             return english.noSessionsYet == "No sessions yet"
+        }
+
+        failures += run("session store migrates legacy rest history into weekly folders") {
+            let tempDirectory = makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+            let calendar = makeUTCCalendar()
+            let legacySession = RestSession(
+                scheduledRestSeconds: 300,
+                actualRestSeconds: 240,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 8, hour: 9, minute: 0),
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 8, hour: 9, minute: 4),
+                skipped: false
+            )
+
+            let encoder = JSONEncoder()
+            guard let data = try? encoder.encode([legacySession]) else { return false }
+            let legacyURL = tempDirectory.appendingPathComponent(SessionStore.legacyRestFileName, isDirectory: false)
+            try? data.write(to: legacyURL, options: .atomic)
+
+            let store = SessionStore(baseDirectoryURL: tempDirectory, calendar: calendar)
+            guard store.sessions.count == 1 else { return false }
+            guard store.restSessions.count == 1 else { return false }
+
+            let migratedURL = tempDirectory
+                .appendingPathComponent("history", isDirectory: true)
+                .appendingPathComponent("weeks", isDirectory: true)
+                .appendingPathComponent("2026-04-06", isDirectory: true)
+                .appendingPathComponent(SessionStore.restSessionsFileName, isDirectory: false)
+
+            guard FileManager.default.fileExists(atPath: migratedURL.path) else { return false }
+            return FileManager.default.fileExists(atPath: legacyURL.path) == false
+        }
+
+        failures += run("daily totals honor cutoff live phase and short session threshold") {
+            let calendar = makeUTCCalendar()
+            let focusSessions = [
+                FocusSession(
+                    scheduledFocusSeconds: 1_200,
+                    actualFocusSeconds: 1_200,
+                    startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 1, minute: 50),
+                    endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 2, minute: 10),
+                    endReason: .scheduledBreak
+                )
+            ]
+            let restSessions = [
+                RestSession(
+                    scheduledRestSeconds: 300,
+                    actualRestSeconds: 300,
+                    startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 1, minute: 0),
+                    endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 1, minute: 5),
+                    skipped: false
+                ),
+                RestSession(
+                    scheduledRestSeconds: 8,
+                    actualRestSeconds: 8,
+                    startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 2, minute: 2),
+                    endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 2, minute: 2, second: 8),
+                    skipped: false
+                )
+            ]
+            let now = makeUTCDate(year: 2026, month: 4, day: 10, hour: 2, minute: 20)
+            let activePhase = ActiveSessionSnapshot(
+                kind: .focus,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 2, minute: 5),
+                scheduledSeconds: 3_600,
+                breakKind: nil
+            )
+
+            let snapshot = DailyTotalsCalculator.snapshot(
+                focusSessions: focusSessions,
+                restSessions: restSessions,
+                activePhase: activePhase,
+                dayBoundaryHour: 2,
+                now: now,
+                calendar: calendar
+            )
+
+            guard snapshot.todayStartDate == makeUTCDate(year: 2026, month: 4, day: 10, hour: 2, minute: 0) else { return false }
+            guard snapshot.focusSeconds == 1_500 else { return false }
+            guard snapshot.restSeconds == 0 else { return false }
+            guard snapshot.trendDays.count == 7 else { return false }
+            guard snapshot.trendDays[5].focusSeconds == 600 else { return false }
+            return snapshot.trendDays[5].restSeconds == 300
+        }
+
+        failures += run("screen lock rest stays out of recent sessions") {
+            let tempDirectory = makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+            let store = SessionStore(baseDirectoryURL: tempDirectory, calendar: makeUTCCalendar())
+            store.add(restSession: RestSession(
+                scheduledRestSeconds: 120,
+                actualRestSeconds: 120,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 12, minute: 0),
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 12, minute: 2),
+                skipped: false,
+                source: .screenLock
+            ))
+
+            guard store.restSessions.count == 1 else { return false }
+            return store.sessions.isEmpty
         }
 
         failures += run("launch at login status messages are bilingual") {
@@ -396,6 +509,9 @@ struct RhythmTDDRunner {
 
             guard engine.mode == .focusing else { return false }
             guard engine.secondsUntilBreak == 10 else { return false }
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .scheduledBreak else { return false }
+            guard sessions.capturedFocus[0].actualFocusSeconds == 10 else { return false }
             guard sessions.captured.count == 1 else { return false }
             guard sessions.captured[0].breakKind == .standard else { return false }
             guard sessions.captured[0].scheduledRestSeconds == 5 else { return false }
@@ -580,7 +696,38 @@ struct RhythmTDDRunner {
             guard engine.mode == .resting else { return false }
             guard engine.activeBreakKind == .standard else { return false }
             guard overlay.lastPresentedRestSeconds == 90 else { return false }
-            return sessions.captured.isEmpty
+            guard sessions.captured.isEmpty else { return false }
+            guard sessions.capturedFocus.isEmpty else { return false }
+            return true
+        }
+
+        failures += run("manual break records focus session after elapsed focus time") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_675))
+            let settings = FakeSettings(focusSeconds: 20, restSeconds: 90)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(7)
+            engine.processTick(now: clock.now)
+            engine.startBreakNow()
+
+            guard engine.mode == .resting else { return false }
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .manualBreak else { return false }
+            guard sessions.capturedFocus[0].scheduledFocusSeconds == 20 else { return false }
+            return sessions.capturedFocus[0].actualFocusSeconds == 7
         }
 
         failures += run("desk break stays on menu and notifies on completion") {
@@ -662,6 +809,43 @@ struct RhythmTDDRunner {
             return notifier.notifiedKinds.isEmpty
         }
 
+        failures += run("screen lock during break stores timer rest plus hidden lock rest") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_850))
+            let settings = FakeSettings(focusSeconds: 5, restSeconds: 30)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(5)
+            engine.processTick(now: clock.now)
+            clock.now = clock.now.addingTimeInterval(12)
+            engine.processTick(now: clock.now)
+
+            lock.fireLock()
+
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].source == .timer else { return false }
+            guard sessions.captured[0].actualRestSeconds == 12 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(60)
+            lock.fireUnlock()
+
+            guard sessions.captured.count == 2 else { return false }
+            guard sessions.captured[1].source == .screenLock else { return false }
+            return sessions.captured[1].actualRestSeconds == 60
+        }
+
         failures += run("reset cycle clears focus extension") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 1_800))
             let settings = FakeSettings(focusSeconds: 12, restSeconds: 4)
@@ -689,6 +873,9 @@ struct RhythmTDDRunner {
 
             guard engine.mode == .focusing else { return false }
             guard engine.secondsUntilBreak == 12 else { return false }
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .reset else { return false }
+            guard sessions.capturedFocus[0].scheduledFocusSeconds == 22 else { return false }
             return overlay.dismissCallCount == 1
         }
 
@@ -802,7 +989,7 @@ struct RhythmTDDRunner {
             return overlay.lastPresentedRestSeconds == 30
         }
 
-        failures += run("screen lock resets cycle") {
+        failures += run("screen lock creates hidden rest and fresh focus after unlock") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 2_000))
             let settings = FakeSettings(focusSeconds: 12, restSeconds: 4)
             let sessions = FakeSessionStore()
@@ -829,9 +1016,20 @@ struct RhythmTDDRunner {
 
             lock.fireLock()
 
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .screenLock else { return false }
+            guard sessions.capturedFocus[0].actualFocusSeconds == 5 else { return false }
+            guard sessions.captured.isEmpty else { return false }
+            guard overlay.dismissCallCount == 1 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(1_200)
+            lock.fireUnlock()
+
             guard engine.mode == .focusing else { return false }
             guard engine.secondsUntilBreak == 12 else { return false }
-            return overlay.dismissCallCount == 1
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].source == .screenLock else { return false }
+            return sessions.captured[0].actualRestSeconds == 1_200
         }
 
         if includeUI {
@@ -867,6 +1065,33 @@ private func run(_ name: String, check: () -> Bool) -> Int {
 private func makeIsolatedDefaults() -> (defaults: UserDefaults, suiteName: String) {
     let suiteName = "RhythmTDD.\(UUID().uuidString)"
     return (UserDefaults(suiteName: suiteName)!, suiteName)
+}
+
+private func makeTemporaryDirectory() -> URL {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("RhythmTDD-\(UUID().uuidString)", isDirectory: true)
+    try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
+}
+
+private func makeUTCCalendar() -> Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    calendar.firstWeekday = 2
+    calendar.minimumDaysInFirstWeek = 4
+    return calendar
+}
+
+private func makeUTCDate(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int = 0) -> Date {
+    let calendar = makeUTCCalendar()
+    return calendar.date(from: DateComponents(
+        timeZone: calendar.timeZone,
+        year: year,
+        month: month,
+        day: day,
+        hour: hour,
+        minute: minute,
+        second: second
+    ))!
 }
 
 private func runOverlayFocusSmokeCheck() -> Bool {
@@ -985,11 +1210,16 @@ private final class FakeSettings: RhythmSettings {
 }
 
 @MainActor
-private final class FakeSessionStore: RestSessionStoring {
+private final class FakeSessionStore: SessionRecording {
     private(set) var captured: [RestSession] = []
+    private(set) var capturedFocus: [FocusSession] = []
 
-    func add(_ session: RestSession) {
-        captured.append(session)
+    func add(restSession: RestSession) {
+        captured.append(restSession)
+    }
+
+    func add(focusSession: FocusSession) {
+        capturedFocus.append(focusSession)
     }
 }
 
@@ -1037,10 +1267,15 @@ private final class FakeBreakNotifier: BreakCompletionNotifying {
 @MainActor
 private final class FakeLockMonitor: ScreenLockMonitoring {
     var onScreenLocked: (() -> Void)?
+    var onScreenUnlocked: (() -> Void)?
     func start() {}
     func stop() {}
     func fireLock() {
         onScreenLocked?()
+    }
+
+    func fireUnlock() {
+        onScreenUnlocked?()
     }
 }
 

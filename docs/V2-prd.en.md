@@ -47,12 +47,16 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - the app can switch between Chinese and English in the menu settings
    - first-run language defaults to Chinese only for `zh*` system languages, and to English otherwise
    - future user-facing features are expected to remain bilingual by default
-7. Longer break support is now part of the shipped fork baseline:
+7. The fork now ships a lighter rest model and local history baseline:
    - the regular break default can be set up to 20 minutes
-   - the menu includes direct presets for `Meal`, `Gym`, `Nap`, `Errand`, and `Desk break`
+   - `Desk break` is the single explicit on-screen non-work break action in the menu
    - `Desk break` is intentionally non-blocking and continues in the menu without forcing a full-screen overlay
-   - the blocking overlay remains the default for regular breaks and away-from-screen long breaks
-   - session history now records the break kind as well as planned and actual duration
+   - screen lock now counts as hidden away-from-screen rest until unlock, then starts a fresh focus cycle
+   - local history now stores focus and rest sessions in weekly JSON folders under Application Support
+8. Daily totals are now part of the shipped menu baseline:
+   - the menu shows today's focus and rest totals
+   - the menu shows a compact 7-day two-color trend
+   - the day boundary for totals can be shifted from `00:00` to `23:00`
 
 ## 3. What V2 Is Trying to Improve
 
@@ -62,7 +66,7 @@ The core V2 goals are:
 
 1. Separate "default rhythm" from "adjustments to the current phase"
 2. Let common in-the-moment decisions happen directly from the menu bar or overlay
-3. Make bilingual UI the default product baseline for all future features, while leaving room for longer-break scenarios without introducing a heavy product surface
+3. Make bilingual UI the default product baseline for all future features, while keeping summary/history features lightweight
 
 ## 4. Product Direction for V2
 
@@ -125,33 +129,41 @@ Current expectations:
 - first-run language follows a simple rule: `zh*` system languages use Chinese, and all other system languages use English
 - future user-facing features should ship with both Chinese and English copy instead of adding a single-language UI first
 
-### 5.2 Longer Break Support Baseline
+### 5.2 Rest Model Baseline
 
-Longer breaks are no longer just a future direction in this fork. The current shipped model is:
+The current shipped rest model is intentionally simpler than the earlier long-break preset matrix:
 
 - regular short breaks remain configurable and can now go up to 20 minutes
-- `Meal`, `Gym`, `Nap`, and `Errand` are longer blocking breaks that still use the full-screen overlay
 - `Desk break` is the deliberate on-screen, non-work break for watching a video, reading posts, or similar casual use
 - when `Desk break` ends, Rhythm returns to focus automatically and should notify the user when notification permissions allow
+- away-from-desk time is represented by locking the Mac, which is counted as hidden rest until unlock
 
-This keeps one clear screen-allowed category without turning every break into a separate behavior matrix.
+This keeps one clear on-screen break action while letting real away time follow normal screen-lock behavior.
 
 ### 5.3 Daily Focus / Break Totals
 
-Without introducing a heavy analytics surface, add lightweight daily totals so users can answer two basic questions:
+Without introducing a heavy analytics surface, the fork now ships lightweight daily totals so users can answer two basic questions:
 
 - how much did I focus today?
 - how much did I rest today?
 
+The shipped UI keeps this compact:
+
+- two numbers for today's focus and rest
+- a 7-day two-color trend bar view in the menu
+- a configurable day cutoff hour so reporting can roll over later than midnight
+
 ### 5.4 Revisit Screen-Lock Reset Behavior
 
-V1's "screen lock always resets the cycle" rule is simple, but it may deserve another look once phase-level adjustments become more important.
+The shipped fork no longer treats screen lock as a plain reset.
 
-Questions worth revisiting:
+Current behavior:
 
-- should screen lock always return the app to a full focus cycle?
-- should phase extensions made before the lock be discarded?
-- should a short lock and a long away-from-keyboard period behave the same way?
+- locking the screen ends the current visible focus or break segment
+- the lock-to-unlock interval is recorded as hidden rest time
+- unlocking starts a fresh focus cycle
+
+This better matches "I left my desk" behavior without requiring extra break presets.
 
 ## 6. Non-Goals
 
@@ -173,11 +185,13 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 5. Session history records the final planned break duration for that cycle, not the stale default value
 6. The menu bar entry remains visible or recoverable in common failure scenarios
 7. The menu bar entry keeps the icon and shows a live countdown in both focus and break states without obvious jitter
-8. `Desk break` can continue without a blocking overlay, while other break types keep the stronger interruption model
+8. `Desk break` can continue without a blocking overlay
+9. Daily totals stay compact in the menu while still showing a minimal 7-day trend
+10. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
 
 ## 8. Open Questions
 
 These questions remain intentionally unresolved in this draft:
 
-1. Should daily totals be simple numbers only, or should there be a minimal trend view?
-2. Should screen-lock behavior stay as an immediate reset, or should it vary based on how long the machine was locked?
+1. Whether local history should eventually get a dedicated browsing/export surface instead of remaining menu-only
+2. Whether custom user-defined break presets should come back later as a separate feature from totals/history

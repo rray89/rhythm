@@ -12,27 +12,37 @@ struct MenuBarView: View {
         AppStrings(language: settingsStore.effectiveAppLanguage)
     }
 
+    private var calendar: Calendar {
+        Calendar.current
+    }
+
     private var settingTitleWidth: CGFloat {
-        settingsStore.effectiveAppLanguage == .english ? 78 : 64
+        settingsStore.effectiveAppLanguage == .english ? 82 : 68
     }
 
     private var currentBreakKind: BreakKind {
         timerEngine.activeBreakKind ?? .standard
     }
 
+    private var dailySnapshot: DailyTotalsSnapshot {
+        sessionStore.summary(
+            activePhase: timerEngine.activeSessionSnapshot,
+            dayBoundaryHour: settingsStore.dayBoundaryHour,
+            now: Date()
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             headerSection
             statusSection
-            if timerEngine.mode == .focusing {
-                longBreaksSection
-            }
             configSection
+            todaySection
             sessionsSection
             actionSection
         }
         .padding(14)
-        .frame(width: 368)
+        .frame(width: 392)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -129,16 +139,6 @@ struct MenuBarView: View {
         }
     }
 
-    private var longBreaksSection: some View {
-        sectionContainer {
-            sectionHeading(strings.longBreaksTitle)
-
-            LongBreakPresetsView(language: settingsStore.effectiveAppLanguage) { preset in
-                timerEngine.startBreak(preset: preset)
-            }
-        }
-    }
-
     private var configSection: some View {
         sectionContainer {
             sectionHeading(strings.settingsTitle)
@@ -159,6 +159,15 @@ struct MenuBarView: View {
                 canIncrease: settingsStore.restSeconds < (SettingsStore.restPresetSeconds.last ?? SettingsStore.maxRestSeconds),
                 onDecrease: decreaseRestDuration,
                 onIncrease: increaseRestDuration
+            )
+
+            compactSettingRow(
+                title: strings.dayCutoffTitle,
+                value: strings.dayCutoffValue(settingsStore.dayBoundaryHour),
+                canDecrease: settingsStore.dayBoundaryHour > SettingsStore.minDayBoundaryHour,
+                canIncrease: settingsStore.dayBoundaryHour < SettingsStore.maxDayBoundaryHour,
+                onDecrease: decreaseDayBoundaryHour,
+                onIncrease: increaseDayBoundaryHour
             )
 
             languageSettingRow(
@@ -191,6 +200,36 @@ struct MenuBarView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var todaySection: some View {
+        let snapshot = dailySnapshot
+
+        return sectionContainer {
+            HStack(alignment: .firstTextBaseline) {
+                sectionHeading(strings.todayTitle)
+                Spacer(minLength: 0)
+                Text(strings.dayCutoffValue(settingsStore.dayBoundaryHour))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 10) {
+                todayMetric(
+                    title: strings.todayFocusTitle,
+                    value: strings.compactDurationLabel(snapshot.focusSeconds),
+                    tint: .accentColor
+                )
+
+                todayMetric(
+                    title: strings.todayRestTitle,
+                    value: strings.compactDurationLabel(snapshot.restSeconds),
+                    tint: .orange
+                )
+            }
+
+            DailyTrendBarsView(days: snapshot.trendDays, strings: strings, calendar: calendar)
         }
     }
 
@@ -231,6 +270,11 @@ struct MenuBarView: View {
             if timerEngine.mode == .focusing {
                 Button(strings.startBreakNowButton) {
                     timerEngine.startBreakNow()
+                }
+                .buttonStyle(.bordered)
+
+                Button(strings.deskBreakButton) {
+                    timerEngine.startBreak(preset: .deskBreak)
                 }
                 .buttonStyle(.bordered)
             } else {
@@ -329,6 +373,26 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder
+    private func todayMetric(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(tint.opacity(0.10))
+        )
+    }
+
+    @ViewBuilder
     private func compactAdjustButton(systemImage: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
@@ -367,6 +431,14 @@ struct MenuBarView: View {
         settingsStore.restSeconds = previous
     }
 
+    private func increaseDayBoundaryHour() {
+        settingsStore.dayBoundaryHour += 1
+    }
+
+    private func decreaseDayBoundaryHour() {
+        settingsStore.dayBoundaryHour -= 1
+    }
+
     private func timeLabel(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MM-dd HH:mm"
@@ -390,5 +462,90 @@ struct MenuBarView: View {
     private func sectionHeading(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
+    }
+}
+
+private struct DailyTrendBarsView: View {
+    let days: [DailyTrendDay]
+    let strings: AppStrings
+    let calendar: Calendar
+
+    private var maxCombinedSeconds: Int {
+        max(days.map { $0.focusSeconds + $0.restSeconds }.max() ?? 0, 1)
+    }
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            ForEach(Array(days.enumerated()), id: \.offset) { item in
+                TrendBarDayView(
+                    day: item.element,
+                    isToday: item.offset == days.count - 1,
+                    maxCombinedSeconds: maxCombinedSeconds,
+                    strings: strings,
+                    calendar: calendar
+                )
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 2)
+    }
+}
+
+private struct TrendBarDayView: View {
+    let day: DailyTrendDay
+    let isToday: Bool
+    let maxCombinedSeconds: Int
+    let strings: AppStrings
+    let calendar: Calendar
+
+    private var combinedSeconds: Int {
+        day.focusSeconds + day.restSeconds
+    }
+
+    private var totalHeight: CGFloat {
+        if combinedSeconds == 0 {
+            return 0
+        }
+        return max(8, CGFloat(combinedSeconds) / CGFloat(maxCombinedSeconds) * 54)
+    }
+
+    private var focusHeight: CGFloat {
+        guard combinedSeconds > 0 else { return 0 }
+        return totalHeight * CGFloat(day.focusSeconds) / CGFloat(max(combinedSeconds, 1))
+    }
+
+    private var restHeight: CGFloat {
+        guard combinedSeconds > 0 else { return 0 }
+        return totalHeight * CGFloat(day.restSeconds) / CGFloat(max(combinedSeconds, 1))
+    }
+
+    var body: some View {
+        VStack(spacing: 5) {
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(0.05))
+                    .frame(width: 26, height: 58)
+
+                VStack(spacing: 2) {
+                    if restHeight > 0 {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Color.orange.opacity(isToday ? 0.95 : 0.75))
+                            .frame(width: 26, height: restHeight)
+                    }
+
+                    if focusHeight > 0 {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Color.accentColor.opacity(isToday ? 1.0 : 0.82))
+                            .frame(width: 26, height: focusHeight)
+                    }
+                }
+                .frame(width: 26, height: 58, alignment: .bottom)
+            }
+
+            Text(strings.weekdayTrendLabel(calendar.component(.weekday, from: day.startDate)))
+                .font(.caption2.weight(isToday ? .semibold : .regular))
+                .foregroundStyle(isToday ? .primary : .secondary)
+                .frame(width: 26)
+        }
     }
 }

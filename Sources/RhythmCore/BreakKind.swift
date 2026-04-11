@@ -46,11 +46,9 @@ public struct BreakPreset: Codable, Hashable, Identifiable, Sendable {
 }
 
 public extension BreakPreset {
+    static let deskBreak = BreakPreset(kind: .desk, durationSeconds: 20 * 60)
+
     static let longBreaks: [BreakPreset] = [
-        BreakPreset(kind: .meal, durationSeconds: 45 * 60),
-        BreakPreset(kind: .gym, durationSeconds: 2 * 60 * 60),
-        BreakPreset(kind: .nap, durationSeconds: 45 * 60),
-        BreakPreset(kind: .errand, durationSeconds: 45 * 60),
-        BreakPreset(kind: .desk, durationSeconds: 20 * 60)
+        deskBreak
     ]
 }
