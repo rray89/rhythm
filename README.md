@@ -27,11 +27,12 @@ Rhythm 是一个 macOS 节奏提醒工具，帮助用户建立稳定的「专注
 - 日切换点：可在设置中把“今天”的统计分界点调到 `00:00`-`23:00`
 - 不休息模式：可开启“不休息”，到点自动跳过并记录本次应休息会话
 - 锁屏离屏休息：锁屏会结束当前专注或休息片段，并把锁定到解锁之间的时间记为离屏休息；解锁后自动开始新的专注周期
+- 应用关闭休息：正常退出或关机时会记录关闭时间；下次启动时把关闭期间记为隐藏休息，并用 15 分钟 heartbeat 作为异常退出兜底，单次最多计入 12 小时
 - 桌前休息：菜单中提供单独的 `桌前休息` 快捷动作，用于“继续用电脑但不工作”的休息场景
 - 休息呈现分层：
   - 普通休息使用全屏半透明遮罩，支持 `ESC` 提前结束
   - `桌前休息` 不锁屏，可继续使用 Mac，倒计时在菜单中继续，结束后自动恢复专注并尝试发送通知
-- 数据记录：保存专注 / 休息片段、计划时长、实际时长、结束原因，并按周写入本地 `Application Support/Rhythm/history/weeks/` JSON 历史目录
+- 数据记录：保存专注 / 休息片段、计划时长、实际时长、结束原因，并按周写入本地 `Application Support/Rhythm/history/weeks/` JSON 历史目录；应用关闭恢复状态写入 `Application Support/Rhythm/state/app-lifecycle.json`
 - 菜单栏应用：常驻状态栏，保留图标并实时显示当前倒计时，快速查看状态与最近记录
 - 开机启动：支持在菜单中开启/关闭登录时启动（打包安装后可用）
 
@@ -63,6 +64,7 @@ swift run RhythmTDD
 - 专注 / 休息 history、周目录迁移与每日总量统计
 - 跳过休息与 `桌前休息` 的 session 记录
 - 锁屏离屏休息与解锁后新专注周期
+- 应用关闭后的隐藏休息、heartbeat 异常退出恢复与 12 小时上限
 - 休息遮罩可见性与焦点（自动 smoke）
 
 如需临时跳过 UI 集成 smoke：
@@ -104,6 +106,7 @@ RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
 │   │   ├── RhythmBrand.swift
 │   │   └── RhythmApp.swift
 │   ├── RhythmCore/
+│   │   ├── AppLifecycleStore.swift
 │   │   ├── BreakKind.swift
 │   │   ├── Localization.swift
 │   │   ├── Persistence.swift
