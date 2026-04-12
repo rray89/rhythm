@@ -339,6 +339,29 @@ struct RhythmTDDRunner {
             return store.sessions.isEmpty
         }
 
+        failures += run("system sleep rest stays out of recent sessions but counts in totals") {
+            let tempDirectory = makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+            let store = SessionStore(baseDirectoryURL: tempDirectory, calendar: makeUTCCalendar())
+            let startedAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 14, minute: 0)
+            let endedAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 14, minute: 20)
+
+            store.add(restSession: RestSession(
+                scheduledRestSeconds: 1_200,
+                actualRestSeconds: 1_200,
+                startedAt: startedAt,
+                endedAt: endedAt,
+                skipped: false,
+                source: .systemSleep
+            ))
+
+            guard store.restSessions.count == 1 else { return false }
+            guard store.sessions.isEmpty else { return false }
+            let summary = store.summary(activePhase: nil, dayBoundaryHour: 0, now: endedAt)
+            return summary.restSeconds == 1_200
+        }
+
         failures += run("app downtime recovery from clean exit is hidden and counted") {
             let tempDirectory = makeTemporaryDirectory()
             defer { try? FileManager.default.removeItem(at: tempDirectory) }
@@ -1194,6 +1217,185 @@ struct RhythmTDDRunner {
             return sessions.captured[0].actualRestSeconds == 1_200
         }
 
+        failures += run("system sleep during focus creates hidden rest and fresh focus after wake") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 6_000))
+            let settings = FakeSettings(focusSeconds: 20, restSeconds: 5)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+            let sleep = FakeSleepMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                systemSleepMonitor: sleep,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(7)
+            engine.processTick(now: clock.now)
+            sleep.fireWillSleep()
+
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .systemSleep else { return false }
+            guard sessions.capturedFocus[0].actualFocusSeconds == 7 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(90)
+            engine.handleSystemDidWake(isScreenLocked: false)
+
+            guard engine.mode == .focusing else { return false }
+            guard engine.secondsUntilBreak == 20 else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].source == .systemSleep else { return false }
+            return sessions.captured[0].actualRestSeconds == 90
+        }
+
+        failures += run("system sleep during break closes timer break before hidden sleep rest") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 7_000))
+            let settings = FakeSettings(focusSeconds: 8, restSeconds: 30)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+            let sleep = FakeSleepMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                systemSleepMonitor: sleep,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(8)
+            engine.processTick(now: clock.now)
+            clock.now = clock.now.addingTimeInterval(6)
+            sleep.fireWillSleep()
+
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .scheduledBreak else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].source == .timer else { return false }
+            guard sessions.captured[0].actualRestSeconds == 6 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(120)
+            engine.handleSystemDidWake(isScreenLocked: false)
+
+            guard sessions.captured.count == 2 else { return false }
+            guard sessions.captured[1].source == .systemSleep else { return false }
+            guard sessions.captured[1].actualRestSeconds == 120 else { return false }
+            return engine.secondsUntilBreak == 8
+        }
+
+        failures += run("system sleep while already screen locked keeps one continuous lock rest") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 8_000))
+            let settings = FakeSettings(focusSeconds: 20, restSeconds: 5)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+            let sleep = FakeSleepMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                systemSleepMonitor: sleep,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(4)
+            lock.fireLock()
+            clock.now = clock.now.addingTimeInterval(300)
+            sleep.fireWillSleep()
+            clock.now = clock.now.addingTimeInterval(900)
+            engine.handleSystemDidWake(isScreenLocked: true)
+
+            guard sessions.capturedFocus.count == 1 else { return false }
+            guard sessions.capturedFocus[0].endReason == .screenLock else { return false }
+            guard sessions.captured.isEmpty else { return false }
+
+            clock.now = clock.now.addingTimeInterval(60)
+            lock.fireUnlock()
+
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].source == .screenLock else { return false }
+            return sessions.captured[0].actualRestSeconds == 1_260
+        }
+
+        failures += run("system sleep can continue hidden rest until unlock after wake") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 9_000))
+            let settings = FakeSettings(focusSeconds: 20, restSeconds: 5)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+            let sleep = FakeSleepMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                systemSleepMonitor: sleep,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(5)
+            sleep.fireWillSleep()
+            clock.now = clock.now.addingTimeInterval(600)
+            engine.handleSystemDidWake(isScreenLocked: true)
+
+            guard sessions.captured.isEmpty else { return false }
+
+            clock.now = clock.now.addingTimeInterval(120)
+            lock.fireUnlock()
+
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].source == .systemSleep else { return false }
+            guard sessions.captured[0].actualRestSeconds == 720 else { return false }
+            return engine.secondsUntilBreak == 20
+        }
+
+        failures += run("daily totals ignore short hidden sleep rest under threshold") {
+            let calendar = makeUTCCalendar()
+            let now = makeUTCDate(year: 2026, month: 4, day: 10, hour: 13, minute: 0)
+            let restSessions = [
+                RestSession(
+                    scheduledRestSeconds: 9,
+                    actualRestSeconds: 9,
+                    startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 12, minute: 59, second: 40),
+                    endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 12, minute: 59, second: 49),
+                    skipped: false,
+                    source: .systemSleep
+                )
+            ]
+
+            let snapshot = DailyTotalsCalculator.snapshot(
+                focusSessions: [],
+                restSessions: restSessions,
+                activePhase: nil,
+                dayBoundaryHour: 0,
+                now: now,
+                calendar: calendar
+            )
+
+            return snapshot.restSeconds == 0
+        }
+
         if includeUI {
             failures += run("overlay smoke is visible and focusable") {
                 runOverlayFocusSmokeCheck()
@@ -1438,6 +1640,22 @@ private final class FakeLockMonitor: ScreenLockMonitoring {
 
     func fireUnlock() {
         onScreenUnlocked?()
+    }
+}
+
+@MainActor
+private final class FakeSleepMonitor: SystemSleepMonitoring {
+    var onWillSleep: (() -> Void)?
+    var onDidWake: (() -> Void)?
+    func start() {}
+    func stop() {}
+
+    func fireWillSleep() {
+        onWillSleep?()
+    }
+
+    func fireDidWake() {
+        onDidWake?()
     }
 }
 

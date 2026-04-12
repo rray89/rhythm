@@ -52,6 +52,7 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - `Desk break` is the single explicit on-screen non-work break action in the menu
    - `Desk break` is intentionally non-blocking and continues in the menu without forcing a full-screen overlay
    - screen lock now counts as hidden away-from-screen rest until unlock, then starts a fresh focus cycle
+   - system sleep without prior lock now also counts as hidden away-from-screen rest, ending at wake or continuing until unlock if wake lands on a locked screen
    - app-off time after normal quit or shutdown is counted as hidden rest on next launch, with a 15-minute heartbeat fallback for unclean exits and a 12-hour cap per gap
    - local history now stores focus and rest sessions in weekly JSON folders under Application Support
 8. Daily totals are now part of the shipped menu baseline:
@@ -166,7 +167,19 @@ Current behavior:
 
 This better matches "I left my desk" behavior without requiring extra break presets.
 
-### 5.5 App-Off Rest Recovery
+### 5.5 Sleep-As-Rest Handling
+
+The shipped fork also treats system sleep as away-from-desk rest when the machine sleeps before the user explicitly locks the screen.
+
+Current behavior:
+
+- sleep ends the current visible focus or timer-break segment at sleep time
+- the sleep interval is recorded as hidden rest
+- if the machine wakes directly back to the desktop, hidden sleep rest ends at wake and Rhythm starts a fresh focus cycle
+- if the machine wakes to a locked screen, hidden sleep rest continues until the user unlocks
+- if the machine was already locked before sleeping, the interval remains one continuous hidden screen-lock rest segment instead of being split into a second rest type
+
+### 5.6 App-Off Rest Recovery
 
 The shipped fork also treats app-off time as hidden rest so daily totals do not lose time when the user quits Rhythm or shuts down the Mac.
 
@@ -187,6 +200,13 @@ This V2 draft still does not aim to add the following right away:
 - complex reporting or charting
 - task management or social pomodoro features
 
+If Apple companion sync is revisited later, it should still be treated as a separate follow-on effort rather than folded into this V2 baseline. The current feasibility read is:
+
+- iPhone and Apple Watch support would likely need dedicated companion app targets instead of trying to stretch the macOS menu bar app across devices
+- private iCloud / CloudKit is the most likely first-party sync path if we want Apple-only companion sync without inventing a custom backend first
+- active timer sync should be modeled as shared phase snapshots and completed session records, not a per-second countdown stream
+- read-only companion surfaces are the safer first milestone; remote timer control and cross-device conflict resolution should come later
+
 ## 7. Acceptance Direction
 
 If the fork's phase-adjustment model is formalized, it should at least satisfy the following:
@@ -201,7 +221,8 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 8. `Desk break` can continue without a blocking overlay
 9. Daily totals stay compact in the menu while still showing a minimal 7-day trend
 10. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
-11. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
+11. System sleep contributes hidden rest and starts a fresh focus cycle after wake or unlock, depending on whether wake lands locked
+12. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
 
 ## 8. Open Questions
 
@@ -209,3 +230,5 @@ These questions remain intentionally unresolved in this draft:
 
 1. Whether local history should eventually get a dedicated browsing/export surface instead of remaining menu-only
 2. Whether custom user-defined break presets should come back later as a separate feature from totals/history
+3. If Apple companion sync is explored later, whether the first shipped scope should be iPhone-first history/today views, then a lighter Apple Watch live-status companion
+4. If active timer state is shared across devices later, which device should own phase changes and how conflicting edits should resolve

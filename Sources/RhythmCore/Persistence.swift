@@ -3,6 +3,7 @@ import Foundation
 public enum RestSessionSource: String, Codable, Sendable {
     case timer
     case screenLock
+    case systemSleep
     case appDowntime
 }
 
@@ -11,6 +12,7 @@ public enum FocusEndReason: String, Codable, Sendable {
     case manualBreak
     case reset
     case screenLock
+    case systemSleep
     case appExit
 }
 

@@ -30,6 +30,7 @@ Rhythm 是一个 macOS 节奏提醒工具，帮助用户建立稳定的「专注
 - 日切换点：可在设置中把“今天”的统计分界点调到 `00:00`-`23:00`
 - 不休息模式：可开启“不休息”，到点自动跳过并记录本次应休息会话
 - 锁屏离屏休息：锁屏会结束当前专注或休息片段，并把锁定到解锁之间的时间记为离屏休息；解锁后自动开始新的专注周期
+- 睡眠离屏休息：如果 Mac 在未先锁屏的情况下直接进入睡眠，Rhythm 会在入睡时结束当前可见片段，并把睡眠时间记为隐藏休息；若唤醒后先进入锁屏，则会继续累计到真正解锁
 - 应用关闭休息：正常退出或关机时会记录关闭时间；下次启动时把关闭期间记为隐藏休息，并用 15 分钟 heartbeat 作为异常退出兜底，单次最多计入 12 小时
 - 桌前休息：菜单中提供单独的 `桌前休息` 快捷动作，用于“继续用电脑但不工作”的休息场景
 - 休息呈现分层：
@@ -67,6 +68,7 @@ swift run RhythmTDD
 - 专注 / 休息 history、周目录迁移与每日总量统计
 - 跳过休息与 `桌前休息` 的 session 记录
 - 锁屏离屏休息与解锁后新专注周期
+- 睡眠离屏休息与唤醒后新专注周期
 - 应用关闭后的隐藏休息、heartbeat 异常退出恢复与 12 小时上限
 - 休息遮罩可见性与焦点（自动 smoke）
 
@@ -109,6 +111,7 @@ RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
 │   │   ├── MenuBarView.swift
 │   │   ├── OverlayManager.swift
 │   │   ├── RhythmBrand.swift
+│   │   ├── SleepWakeMonitor.swift
 │   │   └── RhythmApp.swift
 │   ├── RhythmCore/
 │   │   ├── AppLifecycleStore.swift

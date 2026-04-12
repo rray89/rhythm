@@ -4,6 +4,7 @@ public enum TimerLifecyclePhase: String, Codable, Sendable {
     case focusing
     case resting
     case screenLocked
+    case systemSleep
 }
 
 public struct TimerLifecycleSnapshot: Codable, Equatable, Sendable {
@@ -173,6 +174,17 @@ public final class AppLifecycleStore {
                 skipped: false,
                 skipReason: nil,
                 source: .screenLock
+            ))
+        case .systemSleep:
+            sessionStore.add(restSession: RestSession(
+                breakKind: .standard,
+                scheduledRestSeconds: actualSeconds,
+                actualRestSeconds: actualSeconds,
+                startedAt: snapshot.startedAt,
+                endedAt: endedAt,
+                skipped: false,
+                skipReason: nil,
+                source: .systemSleep
             ))
         }
     }
