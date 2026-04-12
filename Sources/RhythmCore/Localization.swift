@@ -179,6 +179,37 @@ public struct AppStrings {
         }
     }
 
+    public func exportScopeTitle(_ scope: HistoryExportScope, reportingDayLabel: String? = nil) -> String {
+        switch scope {
+        case .today:
+            return todayTitle
+        case .last7Days:
+            return last7DaysTitle
+        case .last30Days:
+            return last30DaysTitle
+        case .allTime:
+            return allTimeTitle
+        case .reportingDay:
+            if let reportingDayLabel {
+                return selectedDayExportTitle(reportingDayLabel)
+            }
+            return localized(chinese: "所选日期", english: "Selected Day")
+        }
+    }
+
+    public func selectedDayExportTitle(_ dateLabel: String) -> String {
+        switch language {
+        case .chinese:
+            return "所选日期（\(dateLabel)）"
+        case .english:
+            return "Selected Day (\(dateLabel))"
+        }
+    }
+
+    public func exportMenuLabel(title: String, count: Int) -> String {
+        "\(title) (\(count))"
+    }
+
     public var totalTitle: String {
         localized(chinese: "总量", english: "Total")
     }

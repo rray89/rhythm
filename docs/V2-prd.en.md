@@ -57,9 +57,9 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - local history now stores focus and rest sessions in weekly JSON folders under Application Support
 8. Daily totals and local history now have a dedicated browsing surface:
    - the menu keeps a compact Today summary with today's focus and rest totals
-   - a dedicated Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries
-   - the Insights window groups session history by reporting day and can export Today, Last 7 Days, Last 30 Days, or All Time as CSV or JSON
-   - the day boundary for totals and history grouping can be shifted from `00:00` to `23:00`
+   - a dedicated Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries with compact range totals
+   - the Insights window browses sessions one reporting day at a time, keeps hidden rest out of the default list, and can export Today, Last 7 Days, Last 30 Days, All Time, or the selected reporting day as CSV or JSON
+   - the day boundary for totals, chart buckets, and history grouping can be shifted from `00:00` to `23:00`
 
 ## 3. What V2 Is Trying to Improve
 
@@ -155,8 +155,8 @@ Without turning the menu into a dense analytics surface, the fork now ships ligh
 The shipped UI keeps this compact:
 
 - the menu keeps two numbers for today's focus and rest plus an entry point into Insights
-- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries
-- the Insights window groups sessions by reporting day, keeps hidden rest out of the list by default, and can export preset ranges as CSV or JSON
+- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries with compact inline totals and explicit range labels
+- the Insights window keeps fixed rolling charts, browses sessions one reporting day at a time, keeps hidden rest out of the list by default, and can export preset ranges plus the selected reporting day as CSV or JSON
 - a configurable day cutoff hour lets totals and grouping roll over later than midnight
 
 ### 5.4 Revisit Screen-Lock Reset Behavior
@@ -203,10 +203,10 @@ Current behavior:
 
 - the menu keeps a compact Today summary and lightweight Recent Sessions list
 - a singleton Insights window can be opened on demand from the menu
-- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time sections in one scrollable view
-- the session list is grouped by reporting day and can filter `All`, `Focus`, or `Rest`
-- hidden rest from screen lock, sleep, and app downtime counts in totals and charts, but only appears in the list when the user enables `Show Hidden Rest`
-- export is explicit and preset-based: Today, Last 7 Days, Last 30 Days, or All Time as CSV or JSON
+- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time sections in one scrollable view, with compact inline totals and explicit date-range labels
+- the session browser shows one reporting day at a time, with a day strip plus `All`, `Focus`, and `Rest` filtering inside that selected day
+- hidden rest from screen lock, sleep, and app downtime counts in totals, charts, and export, but only appears in the list when the user enables `Show Hidden Rest`
+- export is explicit and scoped: Today, Last 7 Days, Last 30 Days, All Time, and the selected reporting day as CSV or JSON
 
 ## 6. Non-Goals
 
@@ -241,7 +241,7 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 11. System sleep contributes hidden rest and starts a fresh focus cycle after wake or unlock, depending on whether wake lands locked
 12. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
 13. Hidden rest counts in totals, trends, and export, but stays out of the default session list unless explicitly revealed
-14. Export supports explicit Today, Last 7 Days, Last 30 Days, and All Time scopes in both CSV and JSON
+14. Export supports explicit Today, Last 7 Days, Last 30 Days, All Time, and selected reporting-day scopes in both CSV and JSON
 
 ## 8. Open Questions
 

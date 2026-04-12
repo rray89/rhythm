@@ -164,6 +164,62 @@ public enum HistoryExportFormat: String, Sendable {
     }
 }
 
+public enum HistoryExportScope: Equatable, Sendable, Codable {
+    case today
+    case last7Days
+    case last30Days
+    case allTime
+    case reportingDay(startDate: Date)
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case reportingDayStart
+    }
+
+    private enum Kind: String, Codable {
+        case today
+        case last7Days
+        case last30Days
+        case allTime
+        case reportingDay
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        switch try container.decode(Kind.self, forKey: .kind) {
+        case .today:
+            self = .today
+        case .last7Days:
+            self = .last7Days
+        case .last30Days:
+            self = .last30Days
+        case .allTime:
+            self = .allTime
+        case .reportingDay:
+            self = .reportingDay(
+                startDate: try container.decode(Date.self, forKey: .reportingDayStart)
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .today:
+            try container.encode(Kind.today, forKey: .kind)
+        case .last7Days:
+            try container.encode(Kind.last7Days, forKey: .kind)
+        case .last30Days:
+            try container.encode(Kind.last30Days, forKey: .kind)
+        case .allTime:
+            try container.encode(Kind.allTime, forKey: .kind)
+        case let .reportingDay(startDate):
+            try container.encode(Kind.reportingDay, forKey: .kind)
+            try container.encode(startDate, forKey: .reportingDayStart)
+        }
+    }
+}
+
 public struct HistoryExportPayload: Sendable {
     public let format: HistoryExportFormat
     public let suggestedFileName: String
@@ -176,12 +232,35 @@ public struct HistoryExportPayload: Sendable {
     }
 }
 
+public struct HistoryExportPreview: Sendable {
+    public let scope: HistoryExportScope
+    public let sessionCount: Int
+    public let rangeStart: Date
+    public let rangeEnd: Date
+
+    public init(scope: HistoryExportScope, sessionCount: Int, rangeStart: Date, rangeEnd: Date) {
+        self.scope = scope
+        self.sessionCount = sessionCount
+        self.rangeStart = rangeStart
+        self.rangeEnd = rangeEnd
+    }
+}
+
 private struct HistoryExportEnvelope: Codable, Sendable {
     let exportedAt: Date
-    let scope: HistoryDisplayRange
+    let scope: HistoryExportScope
     let dayBoundaryHour: Int
     let rangeStart: Date
     let rangeEnd: Date
+    let sessions: [HistorySessionEntry]
+}
+
+private struct ResolvedHistoryExport: Sendable {
+    let scope: HistoryExportScope
+    let dayBoundaryHour: Int
+    let rangeStart: Date
+    let rangeEnd: Date
+    let anchorDate: Date
     let sessions: [HistorySessionEntry]
 }
 
@@ -277,6 +356,31 @@ public enum HistoryInsightsCalculator {
         )
     }
 
+    public static func exportPreview(
+        scope: HistoryExportScope,
+        focusSessions: [FocusSession],
+        restSessions: [RestSession],
+        dayBoundaryHour: Int,
+        now: Date,
+        calendar: Calendar = .current
+    ) -> HistoryExportPreview {
+        let resolved = resolveExport(
+            scope: scope,
+            focusSessions: focusSessions,
+            restSessions: restSessions,
+            dayBoundaryHour: dayBoundaryHour,
+            now: now,
+            calendar: calendar
+        )
+
+        return HistoryExportPreview(
+            scope: resolved.scope,
+            sessionCount: resolved.sessions.count,
+            rangeStart: resolved.rangeStart,
+            rangeEnd: resolved.rangeEnd
+        )
+    }
+
     public static func export(
         scope: HistoryDisplayRange,
         format: HistoryExportFormat,
@@ -286,6 +390,70 @@ public enum HistoryInsightsCalculator {
         now: Date,
         calendar: Calendar = .current
     ) throws -> HistoryExportPayload {
+        try export(
+            scope: HistoryExportScope.from(scope),
+            format: format,
+            focusSessions: focusSessions,
+            restSessions: restSessions,
+            dayBoundaryHour: dayBoundaryHour,
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    public static func export(
+        scope: HistoryExportScope,
+        format: HistoryExportFormat,
+        focusSessions: [FocusSession],
+        restSessions: [RestSession],
+        dayBoundaryHour: Int,
+        now: Date,
+        calendar: Calendar = .current
+    ) throws -> HistoryExportPayload {
+        let resolved = resolveExport(
+            scope: scope,
+            focusSessions: focusSessions,
+            restSessions: restSessions,
+            dayBoundaryHour: dayBoundaryHour,
+            now: now,
+            calendar: calendar
+        )
+        let reportingCalendar = reportingCalendar(from: calendar)
+        let suggestedFileName = suggestedFileName(
+            scope: resolved.scope,
+            format: format,
+            anchorDate: resolved.anchorDate,
+            calendar: reportingCalendar
+        )
+
+        switch format {
+        case .csv:
+            let data = makeCSVData(from: resolved.sessions)
+            return HistoryExportPayload(format: format, suggestedFileName: suggestedFileName, data: data)
+        case .json:
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(HistoryExportEnvelope(
+                exportedAt: now,
+                scope: resolved.scope,
+                dayBoundaryHour: resolved.dayBoundaryHour,
+                rangeStart: resolved.rangeStart,
+                rangeEnd: resolved.rangeEnd,
+                sessions: resolved.sessions
+            ))
+            return HistoryExportPayload(format: format, suggestedFileName: suggestedFileName, data: data)
+        }
+    }
+
+    private static func resolveExport(
+        scope: HistoryExportScope,
+        focusSessions: [FocusSession],
+        restSessions: [RestSession],
+        dayBoundaryHour: Int,
+        now: Date,
+        calendar: Calendar
+    ) -> ResolvedHistoryExport {
         let normalizedCutoff = normalizedDayBoundaryHour(dayBoundaryHour)
         let reportingCalendar = reportingCalendar(from: calendar)
         let todayStart = reportingDayStart(
@@ -313,6 +481,7 @@ public enum HistoryInsightsCalculator {
             todayStart: todayStart,
             nextDayStart: nextDayStart,
             earliestStart: earliestStart,
+            dayBoundaryHour: normalizedCutoff,
             calendar: reportingCalendar
         )
         let scopedEntries = allEntries
@@ -324,31 +493,19 @@ public enum HistoryInsightsCalculator {
                 return lhs.startedAt < rhs.startedAt
             }
 
-        let suggestedFileName = suggestedFileName(
+        return ResolvedHistoryExport(
             scope: scope,
-            format: format,
-            anchorDate: todayStart,
-            calendar: reportingCalendar
-        )
-
-        switch format {
-        case .csv:
-            let data = makeCSVData(from: scopedEntries)
-            return HistoryExportPayload(format: format, suggestedFileName: suggestedFileName, data: data)
-        case .json:
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            encoder.dateEncodingStrategy = .iso8601
-            let data = try encoder.encode(HistoryExportEnvelope(
-                exportedAt: now,
-                scope: scope,
+            dayBoundaryHour: normalizedCutoff,
+            rangeStart: exportRange.lowerBound,
+            rangeEnd: exportRange.upperBound,
+            anchorDate: anchorDate(
+                for: scope,
+                todayStart: todayStart,
                 dayBoundaryHour: normalizedCutoff,
-                rangeStart: exportRange.lowerBound,
-                rangeEnd: exportRange.upperBound,
-                sessions: scopedEntries
-            ))
-            return HistoryExportPayload(format: format, suggestedFileName: suggestedFileName, data: data)
-        }
+                calendar: reportingCalendar
+            ),
+            sessions: scopedEntries
+        )
     }
 
     private static func makeDailyRangeSnapshot(
@@ -523,25 +680,38 @@ public enum HistoryInsightsCalculator {
     }
 
     private static func exportRange(
-        for scope: HistoryDisplayRange,
+        for scope: HistoryExportScope,
         todayStart: Date,
         nextDayStart: Date,
         earliestStart: Date,
+        dayBoundaryHour: Int,
         calendar: Calendar
     ) -> Range<Date> {
         let startDate: Date
+        let endDate: Date
         switch scope {
         case .today:
             startDate = todayStart
+            endDate = nextDayStart
         case .last7Days:
             startDate = calendar.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+            endDate = nextDayStart
         case .last30Days:
             startDate = calendar.date(byAdding: .day, value: -29, to: todayStart) ?? todayStart
+            endDate = nextDayStart
         case .allTime:
             startDate = earliestStart
+            endDate = nextDayStart
+        case let .reportingDay(startDateValue):
+            startDate = reportingDayStart(
+                containing: startDateValue,
+                dayBoundaryHour: dayBoundaryHour,
+                calendar: calendar
+            )
+            endDate = nextReportingDayStart(after: startDate, calendar: calendar)
         }
 
-        return startDate..<nextDayStart
+        return startDate..<endDate
     }
 
     private static func earliestReportingDayStart(
@@ -620,7 +790,7 @@ public enum HistoryInsightsCalculator {
     }
 
     private static func suggestedFileName(
-        scope: HistoryDisplayRange,
+        scope: HistoryExportScope,
         format: HistoryExportFormat,
         anchorDate: Date,
         calendar: Calendar
@@ -631,7 +801,25 @@ public enum HistoryInsightsCalculator {
         formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "yyyy-MM-dd"
         let dateStamp = formatter.string(from: anchorDate)
-        return "rhythm-\(scope.rawValue)-\(dateStamp).\(format.fileExtension)"
+        return "rhythm-\(scope.fileNameComponent)-\(dateStamp).\(format.fileExtension)"
+    }
+
+    private static func anchorDate(
+        for scope: HistoryExportScope,
+        todayStart: Date,
+        dayBoundaryHour: Int,
+        calendar: Calendar
+    ) -> Date {
+        switch scope {
+        case .today, .last7Days, .last30Days, .allTime:
+            return todayStart
+        case let .reportingDay(startDate):
+            return reportingDayStart(
+                containing: startDate,
+                dayBoundaryHour: dayBoundaryHour,
+                calendar: calendar
+            )
+        }
     }
 
     private static func csvField(_ value: String) -> String {
@@ -709,6 +897,36 @@ public enum HistoryInsightsCalculator {
 
         var durationSeconds: Int {
             max(0, Int(endedAt.timeIntervalSince(startedAt)))
+        }
+    }
+}
+
+private extension HistoryExportScope {
+    static func from(_ range: HistoryDisplayRange) -> Self {
+        switch range {
+        case .today:
+            return .today
+        case .last7Days:
+            return .last7Days
+        case .last30Days:
+            return .last30Days
+        case .allTime:
+            return .allTime
+        }
+    }
+
+    var fileNameComponent: String {
+        switch self {
+        case .today:
+            return "today"
+        case .last7Days:
+            return "last7Days"
+        case .last30Days:
+            return "last30Days"
+        case .allTime:
+            return "allTime"
+        case .reportingDay:
+            return "selectedDay"
         }
     }
 }

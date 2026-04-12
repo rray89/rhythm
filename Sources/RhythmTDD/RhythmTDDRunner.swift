@@ -1442,8 +1442,15 @@ struct RhythmTDDRunner {
             guard snapshot.today.restSeconds == 2_100 else { return false }
             guard snapshot.last7Days.trendBuckets.count == 7 else { return false }
             guard snapshot.last30Days.trendBuckets.count == 30 else { return false }
+            guard snapshot.last30Days.trendBuckets.dropLast(2).allSatisfy({ bucket in
+                bucket.focusSeconds == 0 && bucket.restSeconds == 0
+            }) else { return false }
+            guard snapshot.last30Days.trendBuckets.dropLast().last?.focusSeconds == 600 else { return false }
+            guard snapshot.last30Days.trendBuckets.dropLast().last?.restSeconds == 0 else { return false }
             guard snapshot.last7Days.trendBuckets.last?.focusSeconds == 2_100 else { return false }
             guard snapshot.last7Days.trendBuckets.last?.restSeconds == 2_100 else { return false }
+            guard snapshot.last30Days.trendBuckets.last?.focusSeconds == 2_100 else { return false }
+            guard snapshot.last30Days.trendBuckets.last?.restSeconds == 2_100 else { return false }
             return snapshot.allTime.trendBuckets.allSatisfy { $0.unit == .week }
         }
 
@@ -1517,7 +1524,7 @@ struct RhythmTDDRunner {
             ))
 
             guard let csvPayload = try? store.exportHistory(
-                scope: .last7Days,
+                scope: HistoryExportScope.last7Days,
                 format: .csv,
                 dayBoundaryHour: 0,
                 now: now
@@ -1531,7 +1538,7 @@ struct RhythmTDDRunner {
             guard csvText.contains(oldFocusID.uuidString) == false else { return false }
 
             guard let jsonPayload = try? store.exportHistory(
-                scope: .today,
+                scope: HistoryExportScope.today,
                 format: .json,
                 dayBoundaryHour: 0,
                 now: now
@@ -1541,13 +1548,40 @@ struct RhythmTDDRunner {
             guard let object = try? JSONSerialization.jsonObject(with: jsonPayload.data) as? [String: Any] else {
                 return false
             }
-            guard object["scope"] as? String == "today" else { return false }
+            guard let scope = object["scope"] as? [String: Any] else { return false }
+            guard scope["kind"] as? String == "today" else { return false }
             guard object["dayBoundaryHour"] as? Int == 0 else { return false }
             guard let sessions = object["sessions"] as? [[String: Any]] else { return false }
             guard sessions.count == 2 else { return false }
             let ids = sessions.compactMap { $0["sessionID"] as? String }
             guard ids.contains(todayFocusID.uuidString) else { return false }
-            return ids.contains(hiddenRestID.uuidString)
+            guard ids.contains(hiddenRestID.uuidString) else { return false }
+
+            let selectedDayStart = makeUTCDate(year: 2026, month: 4, day: 10, hour: 0, minute: 0)
+            let preview = store.exportPreview(
+                scope: HistoryExportScope.reportingDay(startDate: selectedDayStart),
+                dayBoundaryHour: 0,
+                now: now
+            )
+            guard preview.sessionCount == 2 else { return false }
+
+            guard let selectedDayPayload = try? store.exportHistory(
+                scope: HistoryExportScope.reportingDay(startDate: selectedDayStart),
+                format: .json,
+                dayBoundaryHour: 0,
+                now: now
+            ) else {
+                return false
+            }
+            guard selectedDayPayload.suggestedFileName == "rhythm-selectedDay-2026-04-10.json" else { return false }
+            guard let selectedDayObject = try? JSONSerialization.jsonObject(with: selectedDayPayload.data) as? [String: Any] else {
+                return false
+            }
+            guard let selectedDayScope = selectedDayObject["scope"] as? [String: Any] else { return false }
+            guard selectedDayScope["kind"] as? String == "reportingDay" else { return false }
+            guard selectedDayScope["reportingDayStart"] as? String == "2026-04-10T00:00:00Z" else { return false }
+            guard let selectedDaySessions = selectedDayObject["sessions"] as? [[String: Any]] else { return false }
+            return selectedDaySessions.count == 2
         }
 
         if includeUI {

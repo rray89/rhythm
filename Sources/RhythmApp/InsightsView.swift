@@ -11,11 +11,33 @@ private enum InsightsSessionFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-private struct InsightsSessionGroup: Identifiable {
-    let dayStart: Date
-    let entries: [HistorySessionEntry]
+private struct InsightsInlineMetric: Identifiable {
+    let title: String
+    let value: String
+    let tint: Color
 
-    var id: Date { dayStart }
+    var id: String { title }
+}
+
+private struct InsightsExportOption: Identifiable {
+    let scope: HistoryExportScope
+    let title: String
+    let count: Int
+
+    var id: String {
+        switch scope {
+        case .today:
+            return "today"
+        case .last7Days:
+            return "last7Days"
+        case .last30Days:
+            return "last30Days"
+        case .allTime:
+            return "allTime"
+        case let .reportingDay(startDate):
+            return "reportingDay-\(startDate.timeIntervalSince1970)"
+        }
+    }
 }
 
 struct InsightsView: View {
@@ -25,6 +47,7 @@ struct InsightsView: View {
 
     @State private var sessionFilter: InsightsSessionFilter = .all
     @State private var showHiddenRest = false
+    @State private var selectedSessionDay: Date?
     @State private var exportErrorMessage: String?
 
     private var strings: AppStrings {
@@ -43,12 +66,44 @@ struct InsightsView: View {
         )
     }
 
-    private var filteredSessionEntries: [HistorySessionEntry] {
-        snapshot.sessionEntries.filter { entry in
-            guard showHiddenRest || !entry.isHiddenRest else {
-                return false
-            }
+    private var currentReportingDayStart: Date {
+        snapshot.today.startDate
+    }
 
+    private var dayNavigableEntries: [HistorySessionEntry] {
+        snapshot.sessionEntries.filter { entry in
+            showHiddenRest || !entry.isHiddenRest
+        }
+    }
+
+    private var availableSessionDays: [Date] {
+        Array(Set(dayNavigableEntries.map(\.reportingDayStart))).sorted(by: >)
+    }
+
+    private var preferredSelectedSessionDay: Date? {
+        if availableSessionDays.contains(currentReportingDayStart) {
+            return currentReportingDayStart
+        }
+        return availableSessionDays.first
+    }
+
+    private var resolvedSelectedSessionDay: Date? {
+        if let selectedSessionDay, availableSessionDays.contains(selectedSessionDay) {
+            return selectedSessionDay
+        }
+        return preferredSelectedSessionDay
+    }
+
+    private var selectedDayEntries: [HistorySessionEntry] {
+        guard let resolvedSelectedSessionDay else {
+            return []
+        }
+
+        return dayNavigableEntries.filter { $0.reportingDayStart == resolvedSelectedSessionDay }
+    }
+
+    private var filteredSelectedDayEntries: [HistorySessionEntry] {
+        selectedDayEntries.filter { entry in
             switch sessionFilter {
             case .all:
                 return true
@@ -60,13 +115,56 @@ struct InsightsView: View {
         }
     }
 
-    private var sessionGroups: [InsightsSessionGroup] {
-        let grouped = Dictionary(grouping: filteredSessionEntries, by: \.reportingDayStart)
-        return grouped.keys
-            .sorted(by: >)
-            .map { dayStart in
-                InsightsSessionGroup(dayStart: dayStart, entries: grouped[dayStart] ?? [])
-            }
+    private var selectedDayIndex: Int? {
+        guard let resolvedSelectedSessionDay else {
+            return nil
+        }
+        return availableSessionDays.firstIndex(of: resolvedSelectedSessionDay)
+    }
+
+    private var canSelectNewerDay: Bool {
+        guard let selectedDayIndex else {
+            return false
+        }
+        return selectedDayIndex > 0
+    }
+
+    private var canSelectOlderDay: Bool {
+        guard let selectedDayIndex else {
+            return false
+        }
+        return selectedDayIndex < availableSessionDays.count - 1
+    }
+
+    private var exportOptions: [InsightsExportOption] {
+        exportScopes.map { scope in
+            let preview = sessionStore.exportPreview(
+                scope: scope,
+                dayBoundaryHour: settingsStore.dayBoundaryHour,
+                now: snapshot.generatedAt
+            )
+            return InsightsExportOption(
+                scope: preview.scope,
+                title: exportTitle(for: preview.scope),
+                count: preview.sessionCount
+            )
+        }
+    }
+
+    private var exportScopes: [HistoryExportScope] {
+        var scopes: [HistoryExportScope] = [
+            .today,
+            .last7Days,
+            .last30Days,
+            .allTime,
+        ]
+
+        if let resolvedSelectedSessionDay,
+           resolvedSelectedSessionDay != currentReportingDayStart {
+            scopes.append(.reportingDay(startDate: resolvedSelectedSessionDay))
+        }
+
+        return scopes
     }
 
     var body: some View {
@@ -77,20 +175,17 @@ struct InsightsView: View {
                 trendSection(
                     title: strings.last7DaysTitle,
                     snapshot: snapshot.last7Days,
-                    labelStyle: .weekday,
-                    barWidth: 28
+                    labelStyle: .weekday
                 )
                 trendSection(
                     title: strings.last30DaysTitle,
                     snapshot: snapshot.last30Days,
-                    labelStyle: .dayOfMonthCompressed,
-                    barWidth: 18
+                    labelStyle: .dayOfMonthCompressed
                 )
                 trendSection(
                     title: strings.allTimeTitle,
                     snapshot: snapshot.allTime,
-                    labelStyle: .monthDayCompressed,
-                    barWidth: 16
+                    labelStyle: .monthDayCompressed
                 )
                 sessionsSection
                 exportSection
@@ -98,6 +193,13 @@ struct InsightsView: View {
             .padding(20)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear(perform: syncSelectedSessionDay)
+        .onChange(of: availableSessionDays) { _ in
+            syncSelectedSessionDay()
+        }
+        .onChange(of: currentReportingDayStart) { _ in
+            syncSelectedSessionDay()
+        }
     }
 
     private var headerSection: some View {
@@ -107,8 +209,8 @@ struct InsightsView: View {
 
             Spacer(minLength: 0)
 
-            Text(strings.dayCutoffValue(settingsStore.dayBoundaryHour))
-                .font(.caption.monospacedDigit())
+            Text(dayCutoffDetail)
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
@@ -117,27 +219,11 @@ struct InsightsView: View {
         let today = snapshot.today
 
         return sectionContainer {
-            HStack(alignment: .firstTextBaseline) {
-                sectionHeading(strings.todayTitle)
-                Spacer(minLength: 0)
-                Text(strings.dayCutoffValue(settingsStore.dayBoundaryHour))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 12) {
-                summaryMetric(
-                    title: strings.todayFocusTitle,
-                    value: strings.compactDurationLabel(today.focusSeconds),
-                    tint: .accentColor
-                )
-
-                summaryMetric(
-                    title: strings.todayRestTitle,
-                    value: strings.compactDurationLabel(today.restSeconds),
-                    tint: .orange
-                )
-            }
+            InsightsSectionHeader(
+                title: strings.todayTitle,
+                detail: dayCutoffDetail,
+                metrics: metrics(for: today)
+            )
 
             TodayBalanceBar(
                 focusSeconds: today.focusSeconds,
@@ -151,38 +237,20 @@ struct InsightsView: View {
     private func trendSection(
         title: String,
         snapshot: HistoryRangeSnapshot,
-        labelStyle: TrendAxisLabelStyle,
-        barWidth: CGFloat
+        labelStyle: TrendAxisLabelStyle
     ) -> some View {
         sectionContainer {
-            HStack(alignment: .firstTextBaseline) {
-                sectionHeading(title)
-                Spacer(minLength: 0)
-                Text(strings.totalDurationCaption(strings.compactDurationLabel(snapshot.focusSeconds + snapshot.restSeconds)))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 12) {
-                summaryMetric(
-                    title: strings.todayFocusTitle,
-                    value: strings.compactDurationLabel(snapshot.focusSeconds),
-                    tint: .accentColor
-                )
-
-                summaryMetric(
-                    title: strings.todayRestTitle,
-                    value: strings.compactDurationLabel(snapshot.restSeconds),
-                    tint: .orange
-                )
-            }
+            InsightsSectionHeader(
+                title: title,
+                detail: rangeLabel(for: snapshot),
+                metrics: metrics(for: snapshot)
+            )
 
             TrendBucketsView(
                 buckets: snapshot.trendBuckets,
                 labelStyle: labelStyle,
                 strings: strings,
-                calendar: calendar,
-                barWidth: barWidth
+                calendar: calendar
             )
         }
     }
@@ -194,47 +262,69 @@ struct InsightsView: View {
 
                 Spacer(minLength: 0)
 
-                Picker("", selection: $sessionFilter) {
-                    Text(strings.filterAllTitle).tag(InsightsSessionFilter.all)
-                    Text(strings.filterFocusTitle).tag(InsightsSessionFilter.focus)
-                    Text(strings.filterRestTitle).tag(InsightsSessionFilter.rest)
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 190)
-
                 Toggle(strings.showHiddenRestTitle, isOn: $showHiddenRest)
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .fixedSize()
             }
 
-            if sessionGroups.isEmpty {
+            if availableSessionDays.isEmpty {
                 Text(strings.noHistoryYet)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else {
-                LazyVStack(alignment: .leading, spacing: 14) {
-                    ForEach(sessionGroups) { group in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(dayHeaderLabel(for: group.dayStart))
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
+            } else if let resolvedSelectedSessionDay {
+                SessionDayStripView(
+                    days: availableSessionDays,
+                    selectedDay: resolvedSelectedSessionDay,
+                    canSelectNewerDay: canSelectNewerDay,
+                    canSelectOlderDay: canSelectOlderDay,
+                    strings: strings,
+                    calendar: calendar,
+                    locale: displayLocale,
+                    selectNewerDay: selectNewerDay,
+                    selectOlderDay: selectOlderDay,
+                    selectDay: { selectedSessionDay = $0 }
+                )
 
-                            VStack(spacing: 0) {
-                                ForEach(Array(group.entries.enumerated()), id: \.element.id) { item in
-                                    SessionRowView(
-                                        entry: item.element,
-                                        strings: strings,
-                                        dateTimeLabel: timeRangeLabel(for: item.element),
-                                        summaryLabel: sessionSummaryLabel(for: item.element)
-                                    )
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(dayHeaderLabel(for: resolvedSelectedSessionDay))
+                            .font(.subheadline.weight(.semibold))
 
-                                    if item.offset < group.entries.count - 1 {
-                                        Divider()
-                                            .padding(.vertical, 8)
-                                    }
-                                }
+                        Text(strings.sessionCountLabel(filteredSelectedDayEntries.count))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Picker("", selection: $sessionFilter) {
+                        Text(strings.filterAllTitle).tag(InsightsSessionFilter.all)
+                        Text(strings.filterFocusTitle).tag(InsightsSessionFilter.focus)
+                        Text(strings.filterRestTitle).tag(InsightsSessionFilter.rest)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 190)
+                }
+
+                if filteredSelectedDayEntries.isEmpty {
+                    Text(strings.noSessionsYet)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(filteredSelectedDayEntries.enumerated()), id: \.element.id) { item in
+                            SessionRowView(
+                                entry: item.element,
+                                strings: strings,
+                                dateTimeLabel: timeRangeLabel(for: item.element),
+                                summaryLabel: sessionSummaryLabel(for: item.element)
+                            )
+
+                            if item.offset < filteredSelectedDayEntries.count - 1 {
+                                Divider()
+                                    .padding(.vertical, 8)
                             }
                         }
                     }
@@ -267,22 +357,15 @@ struct InsightsView: View {
     @ViewBuilder
     private func exportMenuSection(for format: HistoryExportFormat) -> some View {
         Section(strings.exportFormatTitle(format)) {
-            Button(strings.exportScopeTitle(.today)) {
-                export(scope: .today, format: format)
-            }
-            Button(strings.exportScopeTitle(.last7Days)) {
-                export(scope: .last7Days, format: format)
-            }
-            Button(strings.exportScopeTitle(.last30Days)) {
-                export(scope: .last30Days, format: format)
-            }
-            Button(strings.exportScopeTitle(.allTime)) {
-                export(scope: .allTime, format: format)
+            ForEach(exportOptions) { option in
+                Button(strings.exportMenuLabel(title: option.title, count: option.count)) {
+                    export(scope: option.scope, format: format)
+                }
             }
         }
     }
 
-    private func export(scope: HistoryDisplayRange, format: HistoryExportFormat) {
+    private func export(scope: HistoryExportScope, format: HistoryExportFormat) {
         do {
             let payload = try sessionStore.exportHistory(
                 scope: scope,
@@ -295,6 +378,63 @@ struct InsightsView: View {
         } catch {
             exportErrorMessage = error.localizedDescription
         }
+    }
+
+    private func exportTitle(for scope: HistoryExportScope) -> String {
+        switch scope {
+        case .today, .last7Days, .last30Days, .allTime:
+            return strings.exportScopeTitle(scope)
+        case let .reportingDay(startDate):
+            return strings.exportScopeTitle(
+                scope,
+                reportingDayLabel: shortDayLabel(for: startDate)
+            )
+        }
+    }
+
+    private func metrics(for snapshot: HistoryRangeSnapshot) -> [InsightsInlineMetric] {
+        [
+            InsightsInlineMetric(
+                title: strings.todayFocusTitle,
+                value: strings.compactDurationLabel(snapshot.focusSeconds),
+                tint: .accentColor
+            ),
+            InsightsInlineMetric(
+                title: strings.todayRestTitle,
+                value: strings.compactDurationLabel(snapshot.restSeconds),
+                tint: .orange
+            ),
+            InsightsInlineMetric(
+                title: strings.totalTitle,
+                value: strings.compactDurationLabel(snapshot.focusSeconds + snapshot.restSeconds),
+                tint: .secondary
+            ),
+        ]
+    }
+
+    private var dayCutoffDetail: String {
+        "\(strings.dayCutoffTitle): \(strings.dayCutoffValue(settingsStore.dayBoundaryHour))"
+    }
+
+    private func rangeLabel(for snapshot: HistoryRangeSnapshot) -> String {
+        let endDate = snapshot.endDate.addingTimeInterval(-1)
+        return "\(rangeBoundaryLabel(for: snapshot.startDate, compareTo: endDate)) - \(rangeBoundaryLabel(for: endDate, compareTo: snapshot.startDate))"
+    }
+
+    private func rangeBoundaryLabel(for date: Date, compareTo otherDate: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = displayLocale
+        formatter.timeZone = calendar.timeZone
+
+        let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: otherDate)
+        if strings.language == .chinese {
+            formatter.setLocalizedDateFormatFromTemplate(sameYear ? "M月d日" : "y年M月d日")
+        } else {
+            formatter.setLocalizedDateFormatFromTemplate(sameYear ? "MMM d" : "MMM d, y")
+        }
+
+        return formatter.string(from: date)
     }
 
     private func sessionSummaryLabel(for entry: HistorySessionEntry) -> String {
@@ -343,6 +483,15 @@ struct InsightsView: View {
         return formatter.string(from: date)
     }
 
+    private func shortDayLabel(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = displayLocale
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(strings.language == .chinese ? "M月d日" : "MMM d")
+        return formatter.string(from: date)
+    }
+
     private func timeLabel(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = calendar
@@ -362,26 +511,6 @@ struct InsightsView: View {
     }
 
     @ViewBuilder
-    private func summaryMetric(title: String, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(tint)
-
-            Text(value)
-                .font(.headline.weight(.semibold))
-                .monospacedDigit()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(tint.opacity(0.10))
-        )
-    }
-
-    @ViewBuilder
     private func sectionContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             content()
@@ -398,6 +527,194 @@ struct InsightsView: View {
     private func sectionHeading(_ title: String) -> some View {
         Text(title)
             .font(.headline.weight(.semibold))
+    }
+
+    private func syncSelectedSessionDay() {
+        guard let preferredSelectedSessionDay else {
+            selectedSessionDay = nil
+            return
+        }
+
+        guard let selectedSessionDay else {
+            self.selectedSessionDay = preferredSelectedSessionDay
+            return
+        }
+
+        if !availableSessionDays.contains(selectedSessionDay) {
+            self.selectedSessionDay = preferredSelectedSessionDay
+        }
+    }
+
+    private func selectNewerDay() {
+        guard let selectedDayIndex, canSelectNewerDay else {
+            return
+        }
+
+        selectedSessionDay = availableSessionDays[selectedDayIndex - 1]
+    }
+
+    private func selectOlderDay() {
+        guard let selectedDayIndex, canSelectOlderDay else {
+            return
+        }
+
+        selectedSessionDay = availableSessionDays[selectedDayIndex + 1]
+    }
+}
+
+private struct InsightsSectionHeader: View {
+    let title: String
+    let detail: String
+    let metrics: [InsightsInlineMetric]
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                leadingBlock
+                Spacer(minLength: 12)
+                metricsRow(alignment: .trailing)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                leadingBlock
+                metricsRow(alignment: .leading)
+            }
+        }
+    }
+
+    private var leadingBlock: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.headline.weight(.semibold))
+
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func metricsRow(alignment: HorizontalAlignment) -> some View {
+        HStack(spacing: 18) {
+            ForEach(metrics) { metric in
+                VStack(alignment: alignment, spacing: 2) {
+                    Text(metric.title)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(metric.tint)
+
+                    Text(metric.value)
+                        .font(.caption.weight(.semibold))
+                        .monospacedDigit()
+                }
+            }
+        }
+    }
+}
+
+private struct SessionDayStripView: View {
+    let days: [Date]
+    let selectedDay: Date
+    let canSelectNewerDay: Bool
+    let canSelectOlderDay: Bool
+    let strings: AppStrings
+    let calendar: Calendar
+    let locale: Locale
+    let selectNewerDay: () -> Void
+    let selectOlderDay: () -> Void
+    let selectDay: (Date) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: selectNewerDay) {
+                Image(systemName: "chevron.left")
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.borderless)
+            .disabled(!canSelectNewerDay)
+
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(days, id: \.self) { day in
+                            SessionDayChip(
+                                weekdayLabel: weekdayLabel(for: day),
+                                dateLabel: shortDateLabel(for: day),
+                                isSelected: day == selectedDay,
+                                selectDay: { selectDay(day) }
+                            )
+                            .id(day)
+                        }
+                    }
+                    .padding(.vertical, 1)
+                }
+                .onAppear {
+                    proxy.scrollTo(selectedDay, anchor: .center)
+                }
+                .onChange(of: selectedDay) { day in
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        proxy.scrollTo(day, anchor: .center)
+                    }
+                }
+            }
+
+            Button(action: selectOlderDay) {
+                Image(systemName: "chevron.right")
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.borderless)
+            .disabled(!canSelectOlderDay)
+        }
+    }
+
+    private func weekdayLabel(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = locale
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(strings.language == .chinese ? "EEE" : "EEE")
+        return formatter.string(from: date)
+    }
+
+    private func shortDateLabel(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = locale
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(strings.language == .chinese ? "M月d日" : "MMM d")
+        return formatter.string(from: date)
+    }
+}
+
+private struct SessionDayChip: View {
+    let weekdayLabel: String
+    let dateLabel: String
+    let isSelected: Bool
+    let selectDay: () -> Void
+
+    var body: some View {
+        Button(action: selectDay) {
+            VStack(spacing: 2) {
+                Text(weekdayLabel)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+
+                Text(dateLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isSelected ? Color.primary : .secondary)
+                    .monospacedDigit()
+            }
+            .frame(minWidth: 64)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isSelected ? Color.accentColor.opacity(0.35) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -484,10 +801,20 @@ private struct TrendBucketsView: View {
     let labelStyle: TrendAxisLabelStyle
     let strings: AppStrings
     let calendar: Calendar
-    let barWidth: CGFloat
 
     private let barSpacing: CGFloat = 6
     private let maxBarHeight: CGFloat = 126
+
+    private var barWidth: CGFloat {
+        switch labelStyle {
+        case .weekday:
+            return 28
+        case .dayOfMonthCompressed:
+            return 18
+        case .monthDayCompressed:
+            return 16
+        }
+    }
 
     private var maxCombinedSeconds: Int {
         max(buckets.map { $0.focusSeconds + $0.restSeconds }.max() ?? 0, 1)
@@ -509,9 +836,7 @@ private struct TrendBucketsView: View {
                         label: axisLabel(for: item.element, index: item.offset, count: buckets.count),
                         tooltip: tooltip(for: item.element),
                         barWidth: barWidth,
-                        maxBarHeight: maxBarHeight,
-                        strings: strings,
-                        calendar: calendar
+                        maxBarHeight: maxBarHeight
                     )
                 }
             }
@@ -521,16 +846,23 @@ private struct TrendBucketsView: View {
     }
 
     private func axisLabel(for bucket: HistoryTrendBucket, index: Int, count: Int) -> String {
+        if index == 0 || index == count - 1 {
+            return monthDayFormatter.string(from: bucket.startDate)
+        }
+
         switch labelStyle {
         case .weekday:
+            guard index % 2 == 0 else {
+                return ""
+            }
             return strings.weekdayTrendLabel(calendar.component(.weekday, from: bucket.startDate))
         case .dayOfMonthCompressed:
-            guard index == count - 1 || index == 0 || index % 5 == 0 else {
+            guard index % 5 == 0 else {
                 return ""
             }
             return dayNumberFormatter.string(from: bucket.startDate)
         case .monthDayCompressed:
-            guard index == count - 1 || index == 0 || index % 4 == 0 else {
+            guard index % 4 == 0 else {
                 return ""
             }
             return monthDayFormatter.string(from: bucket.startDate)
@@ -555,7 +887,7 @@ private struct TrendBucketsView: View {
             dateText,
             "\(strings.todayFocusTitle): \(focusText)",
             "\(strings.todayRestTitle): \(restText)",
-            "\(strings.totalTitle): \(totalText)"
+            "\(strings.totalTitle): \(totalText)",
         ].joined(separator: "\n")
     }
 
@@ -596,59 +928,85 @@ private struct TrendBucketBarView: View {
     let tooltip: String
     let barWidth: CGFloat
     let maxBarHeight: CGFloat
-    let strings: AppStrings
-    let calendar: Calendar
+
+    private let segmentSpacing: CGFloat = 2
+    private let innerPadding: CGFloat = 2
 
     private var combinedSeconds: Int {
         bucket.focusSeconds + bucket.restSeconds
+    }
+
+    private var trackHeight: CGFloat {
+        maxBarHeight - innerPadding * 2
+    }
+
+    private var trackWidth: CGFloat {
+        max(barWidth - innerPadding * 2, 8)
+    }
+
+    private var effectiveSegmentSpacing: CGFloat {
+        bucket.focusSeconds > 0 && bucket.restSeconds > 0 ? segmentSpacing : 0
+    }
+
+    private var drawableHeight: CGFloat {
+        max(0, totalHeight - effectiveSegmentSpacing)
     }
 
     private var totalHeight: CGFloat {
         guard combinedSeconds > 0 else {
             return 0
         }
-        return max(10, CGFloat(combinedSeconds) / CGFloat(maxCombinedSeconds) * maxBarHeight)
+        return max(10, CGFloat(combinedSeconds) / CGFloat(maxCombinedSeconds) * trackHeight)
     }
 
     private var focusHeight: CGFloat {
         guard combinedSeconds > 0 else { return 0 }
-        return totalHeight * CGFloat(bucket.focusSeconds) / CGFloat(max(combinedSeconds, 1))
+        return drawableHeight * CGFloat(bucket.focusSeconds) / CGFloat(max(combinedSeconds, 1))
     }
 
     private var restHeight: CGFloat {
         guard combinedSeconds > 0 else { return 0 }
-        return totalHeight * CGFloat(bucket.restSeconds) / CGFloat(max(combinedSeconds, 1))
+        return drawableHeight * CGFloat(bucket.restSeconds) / CGFloat(max(combinedSeconds, 1))
+    }
+
+    private var labelWidth: CGFloat {
+        max(barWidth + 8, label.count > 3 ? 46 : 24)
     }
 
     var body: some View {
-        VStack(spacing: 6) {
-            ZStack(alignment: .bottom) {
+        VStack(spacing: 8) {
+            ZStack {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .fill(Color.primary.opacity(0.05))
-                    .frame(width: barWidth, height: maxBarHeight)
 
-                VStack(spacing: 2) {
+                VStack(spacing: effectiveSegmentSpacing) {
+                    Spacer(minLength: 0)
+
                     if restHeight > 0 {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.orange.opacity(index == bucketCount - 1 ? 0.95 : 0.75))
-                            .frame(width: barWidth, height: restHeight)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Color.orange.opacity(index == bucketCount - 1 ? 0.95 : 0.78))
+                            .frame(width: trackWidth, height: restHeight)
                     }
 
                     if focusHeight > 0 {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.accentColor.opacity(index == bucketCount - 1 ? 1.0 : 0.82))
-                            .frame(width: barWidth, height: focusHeight)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Color.accentColor.opacity(index == bucketCount - 1 ? 1.0 : 0.86))
+                            .frame(width: trackWidth, height: focusHeight)
                     }
                 }
-                .frame(width: barWidth, height: maxBarHeight, alignment: .bottom)
+                .frame(width: trackWidth, height: trackHeight)
+                .padding(innerPadding)
             }
+            .frame(width: barWidth, height: maxBarHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .help(tooltip)
 
             Text(label)
                 .font(.caption2.weight(index == bucketCount - 1 ? .semibold : .regular))
                 .foregroundStyle(index == bucketCount - 1 ? .primary : .secondary)
-                .frame(width: max(barWidth + 6, 24))
+                .frame(width: labelWidth)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
     }
 }

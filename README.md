@@ -27,7 +27,7 @@ This README describes the behavior currently shipped in this fork. If you want t
 - Temporary phase controls: supports `Start Break 5 Minutes Early`, `Extend Focus 5 Minutes`, `Extend Focus 10 Minutes`, and extending the current break phase
 - Bilingual UI: supports `中文` and `English`; first launch defaults to Chinese only for `zh*` system languages, and English otherwise
 - Daily totals: the menu keeps a compact `Today` summary with today's `Focus` and `Rest` totals
-- Insights window: open a dedicated window from the menu for `Today`, `Last 7 Days`, `Last 30 Days`, and `All Time` summaries, grouped session history, and scoped export
+- Insights window: open a dedicated window from the menu for `Today`, `Last 7 Days`, `Last 30 Days`, and `All Time` summaries, compact range totals, a day-based sessions browser, and scoped export
 - Day cutoff: reporting for "today" can be shifted anywhere from `00:00` to `23:00`
 - No-rest mode: automatically skips breaks when enabled and records the skipped break session
 - Hidden screen-lock rest: locking the screen ends the current focus or break segment, counts lock-to-unlock time as rest, and starts a fresh focus cycle on unlock
@@ -37,7 +37,7 @@ This README describes the behavior currently shipped in this fork. If you want t
 - Layered break presentation:
   - regular breaks use a full-screen translucent overlay and can be ended early with `ESC`
   - `Desk break` stays non-blocking, keeps the Mac usable, continues counting down in the menu, and automatically returns to focus with a completion notification when possible
-- Local history: focus and rest sessions, planned durations, actual durations, and end reasons are stored in weekly JSON history under `Application Support/Rhythm/history/weeks/`; the Insights window groups sessions by reporting day and exports `Today`, `Last 7 Days`, `Last 30 Days`, or `All Time` as CSV or JSON; app-off recovery state lives in `Application Support/Rhythm/state/app-lifecycle.json`
+- Local history: focus and rest sessions, planned durations, actual durations, and end reasons are stored in weekly JSON history under `Application Support/Rhythm/history/weeks/`; the Insights window keeps fixed-range charts, browses sessions one reporting day at a time, and exports `Today`, `Last 7 Days`, `Last 30 Days`, `All Time`, or the selected reporting day as CSV or JSON; app-off recovery state lives in `Application Support/Rhythm/state/app-lifecycle.json`
 - Menu bar app: stays in the status bar, keeps the icon visible, and shows a live countdown for quick status checks and recent history
 - Launch at login: can be enabled or disabled from the menu after the app is installed normally
 
@@ -67,7 +67,7 @@ This command runs repeatable regression coverage for:
 - settings callbacks, range normalization, and legacy settings migration
 - Chinese and English language resolution, persistence, and string formatting
 - focus and rest history, weekly folder migration, and daily totals
-- insights snapshots, hidden-rest history state, and scoped CSV/JSON export
+- insights snapshots, hidden-rest history state, and fixed-range / selected-day CSV/JSON export
 - skipped breaks and `Desk break` session recording
 - hidden screen-lock rest and fresh focus after unlock
 - hidden sleep rest for sleep/wake and wake-to-lock flows
