@@ -207,24 +207,25 @@ struct MenuBarView: View {
             HStack(alignment: .firstTextBaseline) {
                 sectionHeading(strings.todayTitle)
                 Spacer(minLength: 0)
-                Text(strings.dayCutoffValue(settingsStore.dayBoundaryHour))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 14) {
+                    todayInlineMetric(
+                        title: strings.todayFocusTitle,
+                        value: strings.compactDurationLabel(snapshot.focusSeconds),
+                        tint: .accentColor
+                    )
+
+                    todayInlineMetric(
+                        title: strings.todayRestTitle,
+                        value: strings.compactDurationLabel(snapshot.restSeconds),
+                        tint: .orange
+                    )
+                }
             }
 
-            HStack(spacing: 10) {
-                todayMetric(
-                    title: strings.todayFocusTitle,
-                    value: strings.compactDurationLabel(snapshot.focusSeconds),
-                    tint: .accentColor
-                )
-
-                todayMetric(
-                    title: strings.todayRestTitle,
-                    value: strings.compactDurationLabel(snapshot.restSeconds),
-                    tint: .orange
-                )
-            }
+            MenuTodayBalanceBar(
+                focusSeconds: snapshot.focusSeconds,
+                restSeconds: snapshot.restSeconds
+            )
 
             Button(strings.openInsightsButton) {
                 openInsightsWindow()
@@ -374,23 +375,16 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder
-    private func todayMetric(title: String, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private func todayInlineMetric(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(tint)
 
             Text(value)
-                .font(.subheadline.weight(.semibold))
+                .font(.caption.weight(.semibold))
                 .monospacedDigit()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(tint.opacity(0.10))
-        )
     }
 
     @ViewBuilder
@@ -468,5 +462,39 @@ struct MenuBarView: View {
     private func sectionHeading(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
+    }
+}
+
+private struct MenuTodayBalanceBar: View {
+    let focusSeconds: Int
+    let restSeconds: Int
+
+    private var totalSeconds: Int {
+        focusSeconds + restSeconds
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let fullWidth = geometry.size.width
+            let focusFraction = totalSeconds > 0 ? CGFloat(focusSeconds) / CGFloat(totalSeconds) : 0
+            let restFraction = totalSeconds > 0 ? CGFloat(restSeconds) / CGFloat(totalSeconds) : 0
+
+            HStack(spacing: 0) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.accentColor.opacity(focusSeconds > 0 ? 0.95 : 0.12))
+                    .frame(width: max(0, fullWidth * focusFraction))
+
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.orange.opacity(restSeconds > 0 ? 0.90 : 0.12))
+                    .frame(width: max(0, fullWidth * restFraction))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(0.05))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .frame(height: 12)
     }
 }

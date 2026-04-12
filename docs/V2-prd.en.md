@@ -56,7 +56,7 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - app-off time after normal quit or shutdown is counted as hidden rest on next launch, with a 15-minute heartbeat fallback for unclean exits and a 12-hour cap per gap
    - local history now stores focus and rest sessions in weekly JSON folders under Application Support
 8. Daily totals and local history now have a dedicated browsing surface:
-   - the menu keeps a compact Today summary with today's focus and rest totals
+   - the menu keeps a compact Today summary with inline focus/rest totals plus an entry point into Insights
    - a dedicated Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries with compact range totals
    - the Insights window browses sessions one reporting day at a time, keeps hidden rest out of the default list, and can export Today, Last 7 Days, Last 30 Days, All Time, or the selected reporting day as CSV or JSON
    - the day boundary for totals, chart buckets, and history grouping can be shifted from `00:00` to `23:00`
@@ -154,7 +154,7 @@ Without turning the menu into a dense analytics surface, the fork now ships ligh
 
 The shipped UI keeps this compact:
 
-- the menu keeps two numbers for today's focus and rest plus an entry point into Insights
+- the menu keeps inline focus/rest totals for today plus an entry point into Insights
 - the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries with compact inline totals and explicit range labels
 - the Insights window keeps fixed rolling charts, browses sessions one reporting day at a time, keeps hidden rest out of the list by default, and can export preset ranges plus the selected reporting day as CSV or JSON
 - a configurable day cutoff hour lets totals and grouping roll over later than midnight
@@ -201,7 +201,7 @@ The fork now treats local history as more than a raw JSON folder.
 
 Current behavior:
 
-- the menu keeps a compact Today summary and lightweight Recent Sessions list
+- the menu keeps a compact Today summary with inline totals and a lightweight Recent Sessions list
 - a singleton Insights window can be opened on demand from the menu
 - the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time sections in one scrollable view, with compact inline totals and explicit date-range labels
 - the session browser shows one reporting day at a time, with a day strip plus `All`, `Focus`, and `Rest` filtering inside that selected day

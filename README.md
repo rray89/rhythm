@@ -26,7 +26,7 @@ This README describes the behavior currently shipped in this fork. If you want t
 - Custom rhythm: configurable focus interval from 10 to 120 minutes in 5-minute steps, plus configurable break duration from 30 seconds to 20 minutes using common presets
 - Temporary phase controls: supports `Start Break 5 Minutes Early`, `Extend Focus 5 Minutes`, `Extend Focus 10 Minutes`, and extending the current break phase
 - Bilingual UI: supports `中文` and `English`; first launch defaults to Chinese only for `zh*` system languages, and English otherwise
-- Daily totals: the menu keeps a compact `Today` summary with today's `Focus` and `Rest` totals
+- Daily totals: the menu keeps a compact `Today` summary with inline `Focus` / `Rest` totals and a quick path into Insights
 - Insights window: open a dedicated window from the menu for `Today`, `Last 7 Days`, `Last 30 Days`, and `All Time` summaries, compact range totals, a day-based sessions browser, and scoped export
 - Day cutoff: reporting for "today" can be shifted anywhere from `00:00` to `23:00`
 - No-rest mode: automatically skips breaks when enabled and records the skipped break session

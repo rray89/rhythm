@@ -785,10 +785,10 @@ private struct TodayBalanceBar: View {
             .frame(height: 18)
 
             HStack {
-                Text(strings.actualDurationCaption(strings.compactDurationLabel(focusSeconds)))
+                Text("\(strings.todayFocusTitle) \(strings.compactDurationLabel(focusSeconds))")
                     .foregroundStyle(Color.accentColor)
                 Spacer(minLength: 8)
-                Text(strings.actualDurationCaption(strings.compactDurationLabel(restSeconds)))
+                Text("\(strings.todayRestTitle) \(strings.compactDurationLabel(restSeconds))")
                     .foregroundStyle(.orange)
             }
             .font(.caption)
