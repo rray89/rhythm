@@ -30,6 +30,7 @@ This README describes the behavior currently shipped in this fork. If you want t
 - Day cutoff: reporting for "today" can be shifted anywhere from `00:00` to `23:00`
 - No-rest mode: automatically skips breaks when enabled and records the skipped break session
 - Hidden screen-lock rest: locking the screen ends the current focus or break segment, counts lock-to-unlock time as rest, and starts a fresh focus cycle on unlock
+- Hidden sleep rest: if the Mac sleeps without being locked first, Rhythm ends the visible segment at sleep time, counts sleep as hidden rest, and keeps that hidden rest running until unlock if wake lands on a locked screen
 - Hidden app-off rest: normal quit or shutdown records the close time, then the next launch counts that gap as hidden rest; a 15-minute heartbeat provides fallback recovery for unclean exits, capped at 12 hours per gap
 - Desk break: the menu provides a dedicated `Desk break` action for "still on the computer, but not working" scenarios
 - Layered break presentation:
@@ -67,6 +68,7 @@ This command runs repeatable regression coverage for:
 - focus and rest history, weekly folder migration, and daily totals
 - skipped breaks and `Desk break` session recording
 - hidden screen-lock rest and fresh focus after unlock
+- hidden sleep rest for sleep/wake and wake-to-lock flows
 - hidden app-off rest, heartbeat fallback recovery, and the 12-hour cap
 - overlay visibility and focus smoke coverage
 
@@ -109,6 +111,7 @@ RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
 │   │   ├── MenuBarView.swift
 │   │   ├── OverlayManager.swift
 │   │   ├── RhythmBrand.swift
+│   │   ├── SleepWakeMonitor.swift
 │   │   └── RhythmApp.swift
 │   ├── RhythmCore/
 │   │   ├── AppLifecycleStore.swift

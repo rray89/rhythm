@@ -11,7 +11,10 @@ final class AppModel: ObservableObject {
     let launchAtLoginManager: LaunchAtLoginManager
 
     private let appLifecycleStore: AppLifecycleStore
+    private let lockMonitor: LockMonitor
+    private let sleepWakeMonitor: SleepWakeMonitor
     private var heartbeatTimer: Timer?
+    private var wakeResolutionWorkItem: DispatchWorkItem?
 
     init() {
         let settingsStore = SettingsStore()
@@ -19,6 +22,7 @@ final class AppModel: ObservableObject {
         let appLifecycleStore = AppLifecycleStore()
         let overlayManager = OverlayManager(settingsStore: settingsStore)
         let lockMonitor = LockMonitor()
+        let sleepWakeMonitor = SleepWakeMonitor()
         let launchAtLoginManager = LaunchAtLoginManager()
         let breakNotificationManager = BreakNotificationManager(settingsStore: settingsStore)
 
@@ -26,12 +30,15 @@ final class AppModel: ObservableObject {
         self.sessionStore = sessionStore
         self.appLifecycleStore = appLifecycleStore
         self.overlayManager = overlayManager
+        self.lockMonitor = lockMonitor
+        self.sleepWakeMonitor = sleepWakeMonitor
         self.launchAtLoginManager = launchAtLoginManager
         self.timerEngine = TimerEngine(
             settingsStore: settingsStore,
             sessionStore: sessionStore,
             overlayManager: overlayManager,
             lockMonitor: lockMonitor,
+            systemSleepMonitor: sleepWakeMonitor,
             breakNotifier: breakNotificationManager,
             autoStart: false
         )
@@ -40,12 +47,17 @@ final class AppModel: ObservableObject {
         timerEngine.onLifecycleStateChanged = { [weak self] in
             self?.recordLifecycleHeartbeat()
         }
+        sleepWakeMonitor.onDidWake = { [weak self] in
+            self?.resolveWakeState()
+        }
         timerEngine.start()
         startHeartbeatTimer()
         runOverlaySmokeIfNeeded()
     }
 
     func prepareForAppTermination() {
+        wakeResolutionWorkItem?.cancel()
+        wakeResolutionWorkItem = nil
         heartbeatTimer?.invalidate()
         heartbeatTimer = nil
 
@@ -66,6 +78,18 @@ final class AppModel: ObservableObject {
 
     private func recordLifecycleHeartbeat() {
         appLifecycleStore.recordHeartbeat(at: Date(), snapshot: timerEngine.lifecycleSnapshot)
+    }
+
+    private func resolveWakeState() {
+        wakeResolutionWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.timerEngine.handleSystemDidWake(isScreenLocked: self.lockMonitor.isScreenLocked)
+        }
+
+        wakeResolutionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
     }
 
     private func runOverlaySmokeIfNeeded() {
