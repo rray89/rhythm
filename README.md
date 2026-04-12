@@ -10,6 +10,8 @@ Rhythm is a macOS rhythm reminder app that helps users build a steadier focus-an
 
 <img src="assets/menu-panel.png" alt="Rhythm Menu Panel" width="480" />
 
+<img src="assets/insights-window.png" alt="Rhythm Insights Window" width="480" />
+
 <img src="assets/rest-overlay.png" alt="Rhythm Rest Overlay" width="480" />
 
 ## Docs
@@ -138,4 +140,5 @@ RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
 
 - Logo source: `assets/rhythm-logo.svg`
 - Panel screenshot: `assets/menu-panel.png`
+- Insights screenshot: `assets/insights-window.png`
 - Break overlay screenshot: `assets/rest-overlay.png`

@@ -10,6 +10,8 @@ Rhythm 是一个 macOS 节奏提醒工具，帮助用户建立稳定的「专注
 
 <img src="assets/menu-panel.png" alt="Rhythm Menu Panel" width="480" />
 
+<img src="assets/insights-window.png" alt="Rhythm Insights Window" width="480" />
+
 <img src="assets/rest-overlay.png" alt="Rhythm Rest Overlay" width="480" />
 
 ## 文档说明
@@ -138,4 +140,5 @@ RHYTHM_SMOKE_OVERLAY=1 RHYTHM_OVERLAY_DEBUG=1 swift run Rhythm
 
 - Logo 源文件：`assets/rhythm-logo.svg`
 - 面板截图：`assets/menu-panel.png`
+- 数据概览截图：`assets/insights-window.png`
 - 休息提醒截图：`assets/rest-overlay.png`
