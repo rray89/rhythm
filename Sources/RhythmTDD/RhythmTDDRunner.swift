@@ -1451,7 +1451,8 @@ struct RhythmTDDRunner {
             guard snapshot.last7Days.trendBuckets.last?.restSeconds == 2_100 else { return false }
             guard snapshot.last30Days.trendBuckets.last?.focusSeconds == 2_100 else { return false }
             guard snapshot.last30Days.trendBuckets.last?.restSeconds == 2_100 else { return false }
-            return snapshot.allTime.trendBuckets.allSatisfy { $0.unit == .week }
+            guard snapshot.allTime.trendBuckets.allSatisfy({ $0.unit == .month }) else { return false }
+            return snapshot.allTime.trendBuckets.first?.startDate == makeUTCDate(year: 2026, month: 4, day: 1, hour: 4, minute: 0)
         }
 
         failures += run("insights session entries mark hidden rest and reporting day start") {

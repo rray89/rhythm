@@ -185,7 +185,7 @@ struct InsightsView: View {
                 trendSection(
                     title: strings.allTimeTitle,
                     snapshot: snapshot.allTime,
-                    labelStyle: .monthDayCompressed
+                    labelStyle: .monthYearCompressed
                 )
                 sessionsSection
                 exportSection
@@ -429,7 +429,7 @@ struct InsightsView: View {
         switch lastBucket.unit {
         case .day:
             return lastBucket.startDate
-        case .week:
+        case .week, .month:
             return lastBucket.endDate.addingTimeInterval(-1)
         }
     }
@@ -734,7 +734,7 @@ private struct SessionDayChip: View {
 private enum TrendAxisLabelStyle {
     case weekday
     case dayOfMonthCompressed
-    case monthDayCompressed
+    case monthYearCompressed
 }
 
 private enum InsightsExportController {
@@ -825,8 +825,8 @@ private struct TrendBucketsView: View {
             return 28
         case .dayOfMonthCompressed:
             return 18
-        case .monthDayCompressed:
-            return 16
+        case .monthYearCompressed:
+            return 22
         }
     }
 
@@ -861,26 +861,35 @@ private struct TrendBucketsView: View {
     }
 
     private func axisLabel(for bucket: HistoryTrendBucket, index: Int, count: Int) -> String {
-        if index == 0 || index == count - 1 {
-            return monthDayFormatter.string(from: bucket.startDate)
-        }
-
         switch labelStyle {
         case .weekday:
+            if index == 0 || index == count - 1 {
+                return monthDayFormatter.string(from: bucket.startDate)
+            }
             guard index % 2 == 0 else {
                 return ""
             }
             return strings.weekdayTrendLabel(calendar.component(.weekday, from: bucket.startDate))
         case .dayOfMonthCompressed:
+            if index == 0 || index == count - 1 {
+                return monthDayFormatter.string(from: bucket.startDate)
+            }
             guard index % 5 == 0 else {
                 return ""
             }
             return dayNumberFormatter.string(from: bucket.startDate)
-        case .monthDayCompressed:
-            guard index % 4 == 0 else {
+        case .monthYearCompressed:
+            if count == 1 {
+                return monthYearFormatter.string(from: bucket.startDate)
+            }
+            if index == 0 || index == count - 1 {
+                return monthYearFormatter.string(from: bucket.startDate)
+            }
+            let interval = count <= 12 ? 2 : 3
+            guard index % interval == 0 else {
                 return ""
             }
-            return monthDayFormatter.string(from: bucket.startDate)
+            return shortMonthFormatter.string(from: bucket.startDate)
         }
     }
 
@@ -892,6 +901,8 @@ private struct TrendBucketsView: View {
         case .week:
             let endDate = bucket.endDate.addingTimeInterval(-1)
             dateText = "\(fullDateFormatter.string(from: bucket.startDate)) - \(fullDateFormatter.string(from: endDate))"
+        case .month:
+            dateText = monthYearFormatter.string(from: bucket.startDate)
         }
 
         let focusText = strings.compactDurationLabel(bucket.focusSeconds)
@@ -924,12 +935,30 @@ private struct TrendBucketsView: View {
         return formatter
     }
 
+    private var monthYearFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = strings.language == .chinese ? Locale(identifier: "zh_CN") : Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(strings.language == .chinese ? "y年M月" : "MMM y")
+        return formatter
+    }
+
     private var monthDayFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.locale = strings.language == .chinese ? Locale(identifier: "zh_CN") : Locale(identifier: "en_US_POSIX")
         formatter.timeZone = calendar.timeZone
         formatter.setLocalizedDateFormatFromTemplate(strings.language == .chinese ? "M月d日" : "MMM d")
+        return formatter
+    }
+
+    private var shortMonthFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = strings.language == .chinese ? Locale(identifier: "zh_CN") : Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(strings.language == .chinese ? "M月" : "MMM")
         return formatter
     }
 }
@@ -985,7 +1014,7 @@ private struct TrendBucketBarView: View {
     }
 
     private var labelWidth: CGFloat {
-        max(barWidth + 8, label.count > 3 ? 46 : 24)
+        max(barWidth + 8, label.count > 6 ? 62 : (label.count > 3 ? 46 : 24))
     }
 
     var body: some View {

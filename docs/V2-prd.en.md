@@ -155,7 +155,7 @@ Without turning the menu into a dense analytics surface, the fork now ships ligh
 The shipped UI keeps this compact:
 
 - the menu keeps inline focus/rest totals for today plus an entry point into Insights
-- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries with compact inline totals and explicit range labels that follow the reporting-day cutoff
+- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries with compact inline totals and explicit range labels that follow the reporting-day cutoff; the All Time trend is aggregated by month
 - the Insights window keeps fixed rolling charts, browses sessions one reporting day at a time, keeps hidden rest out of the list by default, and can export preset ranges plus the selected reporting day as CSV or JSON
 - a configurable day cutoff hour lets totals and grouping roll over later than midnight
 
@@ -203,7 +203,7 @@ Current behavior:
 
 - the menu keeps a compact Today summary with inline totals and a lightweight Recent Sessions list
 - a singleton Insights window can be opened on demand from the menu
-- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time sections in one scrollable view, with compact inline totals and explicit date-range labels
+- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time sections in one scrollable view, with compact inline totals and explicit date-range labels; the All Time section uses monthly bars so it stays readable as history grows
 - the session browser shows one reporting day at a time, with a day strip plus `All`, `Focus`, and `Rest` filtering inside that selected day
 - hidden rest from screen lock, sleep, and app downtime counts in totals, charts, and export, but only appears in the list when the user enables `Show Hidden Rest`
 - export is explicit and scoped: Today, Last 7 Days, Last 30 Days, All Time, and the selected reporting day as CSV or JSON

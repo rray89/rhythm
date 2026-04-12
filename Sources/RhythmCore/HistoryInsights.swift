@@ -10,6 +10,7 @@ public enum HistoryDisplayRange: String, Codable, CaseIterable, Sendable {
 public enum HistoryTrendUnit: String, Codable, Sendable {
     case day
     case week
+    case month
 }
 
 public struct HistoryTrendBucket: Identifiable, Codable, Sendable {
@@ -330,7 +331,7 @@ public enum HistoryInsightsCalculator {
             intervals: intervals,
             calendar: reportingCalendar
         )
-        let allTimeTrendBuckets = aggregateWeeklyBuckets(
+        let allTimeTrendBuckets = aggregateMonthlyBuckets(
             from: allTimeDailyBuckets,
             dayBoundaryHour: normalizedCutoff,
             calendar: reportingCalendar
@@ -587,6 +588,36 @@ public enum HistoryInsightsCalculator {
                 unit: .week,
                 startDate: weekStart,
                 endDate: weekEnd,
+                focusSeconds: buckets.reduce(0) { $0 + $1.focusSeconds },
+                restSeconds: buckets.reduce(0) { $0 + $1.restSeconds }
+            )
+        }
+    }
+
+    private static func aggregateMonthlyBuckets(
+        from dailyBuckets: [HistoryTrendBucket],
+        dayBoundaryHour: Int,
+        calendar: Calendar
+    ) -> [HistoryTrendBucket] {
+        let grouped = Dictionary(grouping: dailyBuckets) {
+            reportingMonthStart(
+                containing: $0.startDate,
+                dayBoundaryHour: dayBoundaryHour,
+                calendar: calendar
+            )
+        }
+
+        return grouped.keys.sorted().map { monthStart in
+            let buckets = grouped[monthStart] ?? []
+            let monthEnd = nextReportingMonthStart(
+                after: monthStart,
+                dayBoundaryHour: dayBoundaryHour,
+                calendar: calendar
+            )
+            return HistoryTrendBucket(
+                unit: .month,
+                startDate: monthStart,
+                endDate: monthEnd,
                 focusSeconds: buckets.reduce(0) { $0 + $1.focusSeconds },
                 restSeconds: buckets.reduce(0) { $0 + $1.restSeconds }
             )
@@ -869,6 +900,27 @@ public enum HistoryInsightsCalculator {
         let shiftedWeekStart = calendar.dateInterval(of: .weekOfYear, for: shiftedDate)?.start
             ?? calendar.startOfDay(for: shiftedDate)
         return calendar.date(byAdding: .hour, value: dayBoundaryHour, to: shiftedWeekStart) ?? shiftedWeekStart
+    }
+
+    private static func reportingMonthStart(
+        containing date: Date,
+        dayBoundaryHour: Int,
+        calendar: Calendar
+    ) -> Date {
+        let shiftedDate = calendar.date(byAdding: .hour, value: -dayBoundaryHour, to: date) ?? date
+        let shiftedMonthStart = calendar.dateInterval(of: .month, for: shiftedDate)?.start
+            ?? calendar.startOfDay(for: shiftedDate)
+        return calendar.date(byAdding: .hour, value: dayBoundaryHour, to: shiftedMonthStart) ?? shiftedMonthStart
+    }
+
+    private static func nextReportingMonthStart(
+        after monthStart: Date,
+        dayBoundaryHour: Int,
+        calendar: Calendar
+    ) -> Date {
+        let shiftedMonthStart = calendar.date(byAdding: .hour, value: -dayBoundaryHour, to: monthStart) ?? monthStart
+        let nextShiftedMonthStart = calendar.date(byAdding: .month, value: 1, to: shiftedMonthStart) ?? shiftedMonthStart
+        return calendar.date(byAdding: .hour, value: dayBoundaryHour, to: nextShiftedMonthStart) ?? nextShiftedMonthStart
     }
 
     private static func overlapSeconds(of interval: SessionInterval, in range: Range<Date>) -> Int {
