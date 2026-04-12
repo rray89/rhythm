@@ -55,10 +55,11 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - system sleep without prior lock now also counts as hidden away-from-screen rest, ending at wake or continuing until unlock if wake lands on a locked screen
    - app-off time after normal quit or shutdown is counted as hidden rest on next launch, with a 15-minute heartbeat fallback for unclean exits and a 12-hour cap per gap
    - local history now stores focus and rest sessions in weekly JSON folders under Application Support
-8. Daily totals are now part of the shipped menu baseline:
-   - the menu shows today's focus and rest totals
-   - the menu shows a compact 7-day two-color trend
-   - the day boundary for totals can be shifted from `00:00` to `23:00`
+8. Daily totals and local history now have a dedicated browsing surface:
+   - the menu keeps a compact Today summary with today's focus and rest totals
+   - a dedicated Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries
+   - the Insights window groups session history by reporting day and can export Today, Last 7 Days, Last 30 Days, or All Time as CSV or JSON
+   - the day boundary for totals and history grouping can be shifted from `00:00` to `23:00`
 
 ## 3. What V2 Is Trying to Improve
 
@@ -68,7 +69,7 @@ The core V2 goals are:
 
 1. Separate "default rhythm" from "adjustments to the current phase"
 2. Let common in-the-moment decisions happen directly from the menu bar or overlay
-3. Make bilingual UI the default product baseline for all future features, while keeping summary/history features lightweight
+3. Make bilingual UI the default product baseline for all future features, while keeping the menu lightweight and moving deeper history into a dedicated window
 
 ## 4. Product Direction for V2
 
@@ -142,18 +143,21 @@ The current shipped rest model is intentionally simpler than the earlier long-br
 
 This keeps one clear on-screen break action while letting real away time follow normal screen-lock behavior.
 
-### 5.3 Daily Focus / Break Totals
+### 5.3 Daily Focus / Break Totals and Insights Window
 
-Without introducing a heavy analytics surface, the fork now ships lightweight daily totals so users can answer two basic questions:
+Without turning the menu into a dense analytics surface, the fork now ships lightweight daily totals plus a dedicated Insights window so users can answer a few basic questions:
 
 - how much did I focus today?
 - how much did I rest today?
+- what did the last week or month look like?
+- what sessions actually make up those totals?
 
 The shipped UI keeps this compact:
 
-- two numbers for today's focus and rest
-- a 7-day two-color trend bar view in the menu
-- a configurable day cutoff hour so reporting can roll over later than midnight
+- the menu keeps two numbers for today's focus and rest plus an entry point into Insights
+- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries
+- the Insights window groups sessions by reporting day, keeps hidden rest out of the list by default, and can export preset ranges as CSV or JSON
+- a configurable day cutoff hour lets totals and grouping roll over later than midnight
 
 ### 5.4 Revisit Screen-Lock Reset Behavior
 
@@ -191,6 +195,19 @@ Current behavior:
 - each single app-off gap is capped at 12 hours; time beyond the cap is not shown as a special blank in the 7-day aggregate trend
 - app-downtime rest counts in Today totals and the 7-day trend, but stays out of Recent Sessions
 
+### 5.7 History and Export UX
+
+The fork now treats local history as more than a raw JSON folder.
+
+Current behavior:
+
+- the menu keeps a compact Today summary and lightweight Recent Sessions list
+- a singleton Insights window can be opened on demand from the menu
+- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time sections in one scrollable view
+- the session list is grouped by reporting day and can filter `All`, `Focus`, or `Rest`
+- hidden rest from screen lock, sleep, and app downtime counts in totals and charts, but only appears in the list when the user enables `Show Hidden Rest`
+- export is explicit and preset-based: Today, Last 7 Days, Last 30 Days, or All Time as CSV or JSON
+
 ## 6. Non-Goals
 
 This V2 draft still does not aim to add the following right away:
@@ -219,16 +236,18 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 6. The menu bar entry remains visible or recoverable in common failure scenarios
 7. The menu bar entry keeps the icon and shows a live countdown in both focus and break states without obvious jitter
 8. `Desk break` can continue without a blocking overlay
-9. Daily totals stay compact in the menu while still showing a minimal 7-day trend
+9. Daily totals stay compact in the menu while deeper history and export live in the dedicated Insights window
 10. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
 11. System sleep contributes hidden rest and starts a fresh focus cycle after wake or unlock, depending on whether wake lands locked
 12. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
+13. Hidden rest counts in totals, trends, and export, but stays out of the default session list unless explicitly revealed
+14. Export supports explicit Today, Last 7 Days, Last 30 Days, and All Time scopes in both CSV and JSON
 
 ## 8. Open Questions
 
 These questions remain intentionally unresolved in this draft:
 
-1. Whether local history should eventually get a dedicated browsing/export surface instead of remaining menu-only
+1. Whether export should later support custom date ranges beyond Today, Last 7 Days, Last 30 Days, and All Time
 2. Whether custom user-defined break presets should come back later as a separate feature from totals/history
 3. If Apple companion sync is explored later, whether the first shipped scope should be iPhone-first history/today views, then a lighter Apple Watch live-status companion
 4. If active timer state is shared across devices later, which device should own phase changes and how conflicting edits should resolve

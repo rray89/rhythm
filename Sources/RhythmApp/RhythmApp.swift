@@ -6,6 +6,10 @@ import SwiftUI
 final class RhythmAppDelegate: NSObject, NSApplicationDelegate {
     let appModel = AppModel()
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         appModel.prepareForAppTermination()
     }
@@ -46,5 +50,14 @@ struct RhythmApp: App {
             )
         }
         .menuBarExtraStyle(.window)
+
+        Window("Rhythm", id: RhythmWindowID.insights.rawValue) {
+            InsightsView(
+                timerEngine: appDelegate.appModel.timerEngine,
+                settingsStore: appDelegate.appModel.settingsStore,
+                sessionStore: appDelegate.appModel.sessionStore
+            )
+            .frame(minWidth: 860, minHeight: 760)
+        }
     }
 }

@@ -113,6 +113,88 @@ public struct AppStrings {
         localized(chinese: "休息", english: "Rest")
     }
 
+    public var insightsTitle: String {
+        localized(chinese: "数据概览", english: "Insights")
+    }
+
+    public var openInsightsButton: String {
+        localized(chinese: "打开数据概览", english: "Open Insights")
+    }
+
+    public var last7DaysTitle: String {
+        localized(chinese: "最近 7 天", english: "Last 7 Days")
+    }
+
+    public var last30DaysTitle: String {
+        localized(chinese: "最近 30 天", english: "Last 30 Days")
+    }
+
+    public var allTimeTitle: String {
+        localized(chinese: "全部历史", english: "All Time")
+    }
+
+    public var historySessionsTitle: String {
+        localized(chinese: "全部记录", english: "Sessions")
+    }
+
+    public var showHiddenRestTitle: String {
+        localized(chinese: "显示隐藏休息", english: "Show Hidden Rest")
+    }
+
+    public var filterAllTitle: String {
+        localized(chinese: "全部", english: "All")
+    }
+
+    public var filterFocusTitle: String {
+        localized(chinese: "专注", english: "Focus")
+    }
+
+    public var filterRestTitle: String {
+        localized(chinese: "休息", english: "Rest")
+    }
+
+    public var exportTitle: String {
+        localized(chinese: "导出", english: "Export")
+    }
+
+    public func exportFormatTitle(_ format: HistoryExportFormat) -> String {
+        switch format {
+        case .csv:
+            return "CSV"
+        case .json:
+            return "JSON"
+        }
+    }
+
+    public func exportScopeTitle(_ scope: HistoryDisplayRange) -> String {
+        switch scope {
+        case .today:
+            return todayTitle
+        case .last7Days:
+            return last7DaysTitle
+        case .last30Days:
+            return last30DaysTitle
+        case .allTime:
+            return allTimeTitle
+        }
+    }
+
+    public var totalTitle: String {
+        localized(chinese: "总量", english: "Total")
+    }
+
+    public var actualTitle: String {
+        localized(chinese: "实际", english: "Actual")
+    }
+
+    public var plannedTitle: String {
+        localized(chinese: "计划", english: "Planned")
+    }
+
+    public var hiddenRestTitle: String {
+        localized(chinese: "隐藏休息", english: "Hidden rest")
+    }
+
     public var focusIntervalTitle: String {
         localized(chinese: "专注间隔", english: "Focus")
     }
@@ -206,6 +288,10 @@ public struct AppStrings {
 
     public var noSessionsYet: String {
         localized(chinese: "暂无记录", english: "No sessions yet")
+    }
+
+    public var noHistoryYet: String {
+        localized(chinese: "暂无历史记录", english: "No history yet")
     }
 
     public var startBreakEarlyFiveMinutesButton: String {
@@ -451,6 +537,82 @@ public struct AppStrings {
             return localized(chinese: "跳过", english: "Skipped") + " " + countdownLabel(seconds: session.actualRestSeconds)
         }
         return localized(chinese: "完成", english: "Done") + " " + countdownLabel(seconds: session.actualRestSeconds)
+    }
+
+    public func historySessionKindTitle(_ kind: HistorySessionKind) -> String {
+        switch kind {
+        case .focus:
+            return todayFocusTitle
+        case .rest:
+            return todayRestTitle
+        }
+    }
+
+    public func restSourceTitle(_ source: RestSessionSource) -> String {
+        switch source {
+        case .timer:
+            return localized(chinese: "计时休息", english: "Timer break")
+        case .screenLock:
+            return localized(chinese: "锁屏", english: "Screen lock")
+        case .systemSleep:
+            return localized(chinese: "系统睡眠", english: "System sleep")
+        case .appDowntime:
+            return localized(chinese: "应用关闭", english: "App downtime")
+        }
+    }
+
+    public func focusEndReasonTitle(_ reason: FocusEndReason) -> String {
+        switch reason {
+        case .scheduledBreak:
+            return localized(chinese: "到点进入休息", english: "Scheduled break")
+        case .manualBreak:
+            return localized(chinese: "手动开始休息", english: "Manual break")
+        case .reset:
+            return localized(chinese: "手动重置", english: "Timer reset")
+        case .screenLock:
+            return localized(chinese: "锁屏", english: "Screen lock")
+        case .systemSleep:
+            return localized(chinese: "系统睡眠", english: "System sleep")
+        case .appExit:
+            return localized(chinese: "退出应用", english: "App quit")
+        }
+    }
+
+    public func restStateTitle(skipped: Bool, skipReason: String?) -> String {
+        if skipped {
+            if skipReason == "no_rest" {
+                return localized(chinese: "不休息模式", english: "No-rest mode")
+            }
+            return localized(chinese: "提前结束", english: "Ended early")
+        }
+        return localized(chinese: "完成", english: "Completed")
+    }
+
+    public func actualDurationCaption(_ duration: String) -> String {
+        switch language {
+        case .chinese:
+            return "实际 \(duration)"
+        case .english:
+            return "Actual \(duration)"
+        }
+    }
+
+    public func plannedDurationCaption(_ duration: String) -> String {
+        switch language {
+        case .chinese:
+            return "计划 \(duration)"
+        case .english:
+            return "Planned \(duration)"
+        }
+    }
+
+    public func totalDurationCaption(_ duration: String) -> String {
+        switch language {
+        case .chinese:
+            return "总量 \(duration)"
+        case .english:
+            return "Total \(duration)"
+        }
     }
 
     public func countdownLabel(seconds: Int) -> String {

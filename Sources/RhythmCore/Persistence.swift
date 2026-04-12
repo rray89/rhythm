@@ -225,6 +225,38 @@ public final class SessionStore: ObservableObject {
         )
     }
 
+    public func insights(
+        activePhase: ActiveSessionSnapshot?,
+        dayBoundaryHour: Int,
+        now: Date = Date()
+    ) -> HistoryInsightsSnapshot {
+        HistoryInsightsCalculator.snapshot(
+            focusSessions: focusSessions,
+            restSessions: restSessions,
+            activePhase: activePhase,
+            dayBoundaryHour: dayBoundaryHour,
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    public func exportHistory(
+        scope: HistoryDisplayRange,
+        format: HistoryExportFormat,
+        dayBoundaryHour: Int,
+        now: Date = Date()
+    ) throws -> HistoryExportPayload {
+        try HistoryInsightsCalculator.export(
+            scope: scope,
+            format: format,
+            focusSessions: focusSessions,
+            restSessions: restSessions,
+            dayBoundaryHour: dayBoundaryHour,
+            now: now,
+            calendar: calendar
+        )
+    }
+
     private func load() {
         restSessions = loadRestSessionsFromWeeks().sorted { $0.startedAt > $1.startedAt }
         focusSessions = loadFocusSessionsFromWeeks().sorted { $0.startedAt > $1.startedAt }

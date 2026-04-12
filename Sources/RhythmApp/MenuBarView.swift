@@ -3,6 +3,7 @@ import RhythmCore
 import SwiftUI
 
 struct MenuBarView: View {
+    @Environment(\.openWindow) private var openWindow
     @ObservedObject var timerEngine: TimerEngine
     @ObservedObject var settingsStore: SettingsStore
     @ObservedObject var sessionStore: SessionStore
@@ -10,10 +11,6 @@ struct MenuBarView: View {
 
     private var strings: AppStrings {
         AppStrings(language: settingsStore.effectiveAppLanguage)
-    }
-
-    private var calendar: Calendar {
-        Calendar.current
     }
 
     private var settingTitleWidth: CGFloat {
@@ -229,7 +226,11 @@ struct MenuBarView: View {
                 )
             }
 
-            DailyTrendBarsView(days: snapshot.trendDays, strings: strings, calendar: calendar)
+            Button(strings.openInsightsButton) {
+                openInsightsWindow()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
     }
 
@@ -445,6 +446,11 @@ struct MenuBarView: View {
         return formatter.string(from: date)
     }
 
+    private func openInsightsWindow() {
+        openWindow(id: RhythmWindowID.insights.rawValue)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     @ViewBuilder
     private func sectionContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -462,90 +468,5 @@ struct MenuBarView: View {
     private func sectionHeading(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
-    }
-}
-
-private struct DailyTrendBarsView: View {
-    let days: [DailyTrendDay]
-    let strings: AppStrings
-    let calendar: Calendar
-
-    private var maxCombinedSeconds: Int {
-        max(days.map { $0.focusSeconds + $0.restSeconds }.max() ?? 0, 1)
-    }
-
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            ForEach(Array(days.enumerated()), id: \.offset) { item in
-                TrendBarDayView(
-                    day: item.element,
-                    isToday: item.offset == days.count - 1,
-                    maxCombinedSeconds: maxCombinedSeconds,
-                    strings: strings,
-                    calendar: calendar
-                )
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 2)
-    }
-}
-
-private struct TrendBarDayView: View {
-    let day: DailyTrendDay
-    let isToday: Bool
-    let maxCombinedSeconds: Int
-    let strings: AppStrings
-    let calendar: Calendar
-
-    private var combinedSeconds: Int {
-        day.focusSeconds + day.restSeconds
-    }
-
-    private var totalHeight: CGFloat {
-        if combinedSeconds == 0 {
-            return 0
-        }
-        return max(8, CGFloat(combinedSeconds) / CGFloat(maxCombinedSeconds) * 54)
-    }
-
-    private var focusHeight: CGFloat {
-        guard combinedSeconds > 0 else { return 0 }
-        return totalHeight * CGFloat(day.focusSeconds) / CGFloat(max(combinedSeconds, 1))
-    }
-
-    private var restHeight: CGFloat {
-        guard combinedSeconds > 0 else { return 0 }
-        return totalHeight * CGFloat(day.restSeconds) / CGFloat(max(combinedSeconds, 1))
-    }
-
-    var body: some View {
-        VStack(spacing: 5) {
-            ZStack(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.primary.opacity(0.05))
-                    .frame(width: 26, height: 58)
-
-                VStack(spacing: 2) {
-                    if restHeight > 0 {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(Color.orange.opacity(isToday ? 0.95 : 0.75))
-                            .frame(width: 26, height: restHeight)
-                    }
-
-                    if focusHeight > 0 {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(Color.accentColor.opacity(isToday ? 1.0 : 0.82))
-                            .frame(width: 26, height: focusHeight)
-                    }
-                }
-                .frame(width: 26, height: 58, alignment: .bottom)
-            }
-
-            Text(strings.weekdayTrendLabel(calendar.component(.weekday, from: day.startDate)))
-                .font(.caption2.weight(isToday ? .semibold : .regular))
-                .foregroundStyle(isToday ? .primary : .secondary)
-                .frame(width: 26)
-        }
     }
 }
