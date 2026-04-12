@@ -1396,6 +1396,195 @@ struct RhythmTDDRunner {
             return snapshot.restSeconds == 0
         }
 
+        failures += run("insights snapshot aggregates multi-range totals and active focus") {
+            let tempDirectory = makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+            let calendar = makeUTCCalendar()
+            let store = SessionStore(baseDirectoryURL: tempDirectory, calendar: calendar)
+            let now = makeUTCDate(year: 2026, month: 4, day: 10, hour: 5, minute: 45)
+
+            store.add(focusSession: FocusSession(
+                scheduledFocusSeconds: 1_800,
+                actualFocusSeconds: 1_800,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 3, minute: 50),
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 4, minute: 20),
+                endReason: .scheduledBreak
+            ))
+            store.add(restSession: RestSession(
+                scheduledRestSeconds: 300,
+                actualRestSeconds: 300,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 4, minute: 20),
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 4, minute: 25),
+                skipped: false
+            ))
+            store.add(restSession: RestSession(
+                scheduledRestSeconds: 1_800,
+                actualRestSeconds: 1_800,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 5, minute: 0),
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 5, minute: 30),
+                skipped: false,
+                source: .systemSleep
+            ))
+
+            let snapshot = store.insights(
+                activePhase: ActiveSessionSnapshot(
+                    kind: .focus,
+                    startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 5, minute: 30),
+                    scheduledSeconds: 3_600,
+                    breakKind: nil
+                ),
+                dayBoundaryHour: 4,
+                now: now
+            )
+
+            guard snapshot.today.focusSeconds == 2_100 else { return false }
+            guard snapshot.today.restSeconds == 2_100 else { return false }
+            guard snapshot.last7Days.trendBuckets.count == 7 else { return false }
+            guard snapshot.last30Days.trendBuckets.count == 30 else { return false }
+            guard snapshot.last30Days.trendBuckets.dropLast(2).allSatisfy({ bucket in
+                bucket.focusSeconds == 0 && bucket.restSeconds == 0
+            }) else { return false }
+            guard snapshot.last30Days.trendBuckets.dropLast().last?.focusSeconds == 600 else { return false }
+            guard snapshot.last30Days.trendBuckets.dropLast().last?.restSeconds == 0 else { return false }
+            guard snapshot.last7Days.trendBuckets.last?.focusSeconds == 2_100 else { return false }
+            guard snapshot.last7Days.trendBuckets.last?.restSeconds == 2_100 else { return false }
+            guard snapshot.last30Days.trendBuckets.last?.focusSeconds == 2_100 else { return false }
+            guard snapshot.last30Days.trendBuckets.last?.restSeconds == 2_100 else { return false }
+            guard snapshot.allTime.trendBuckets.allSatisfy({ $0.unit == .month }) else { return false }
+            return snapshot.allTime.trendBuckets.first?.startDate == makeUTCDate(year: 2026, month: 4, day: 1, hour: 4, minute: 0)
+        }
+
+        failures += run("insights session entries mark hidden rest and reporting day start") {
+            let tempDirectory = makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+            let calendar = makeUTCCalendar()
+            let store = SessionStore(baseDirectoryURL: tempDirectory, calendar: calendar)
+
+            let focusStartedAt = makeUTCDate(year: 2026, month: 4, day: 10, hour: 3, minute: 55)
+            store.add(focusSession: FocusSession(
+                scheduledFocusSeconds: 900,
+                actualFocusSeconds: 900,
+                startedAt: focusStartedAt,
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 4, minute: 10),
+                endReason: .scheduledBreak
+            ))
+            store.add(restSession: RestSession(
+                scheduledRestSeconds: 600,
+                actualRestSeconds: 600,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 6, minute: 0),
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 6, minute: 10),
+                skipped: false,
+                source: .appDowntime
+            ))
+
+            let snapshot = store.insights(activePhase: nil, dayBoundaryHour: 4, now: makeUTCDate(year: 2026, month: 4, day: 10, hour: 7, minute: 0))
+
+            guard let focusEntry = snapshot.sessionEntries.first(where: { $0.kind == .focus }) else { return false }
+            guard let hiddenRestEntry = snapshot.sessionEntries.first(where: { $0.restSource == .appDowntime }) else { return false }
+            guard focusEntry.reportingDayStart == makeUTCDate(year: 2026, month: 4, day: 9, hour: 4, minute: 0) else { return false }
+            return hiddenRestEntry.isHiddenRest
+        }
+
+        failures += run("history export scopes emit csv and json for matching sessions only") {
+            let tempDirectory = makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+            let calendar = makeUTCCalendar()
+            let store = SessionStore(baseDirectoryURL: tempDirectory, calendar: calendar)
+            let oldFocusID = UUID()
+            let todayFocusID = UUID()
+            let hiddenRestID = UUID()
+            let now = makeUTCDate(year: 2026, month: 4, day: 10, hour: 16, minute: 0)
+
+            store.add(focusSession: FocusSession(
+                id: oldFocusID,
+                scheduledFocusSeconds: 1_200,
+                actualFocusSeconds: 1_000,
+                startedAt: makeUTCDate(year: 2026, month: 3, day: 28, hour: 9, minute: 0),
+                endedAt: makeUTCDate(year: 2026, month: 3, day: 28, hour: 9, minute: 16, second: 40),
+                endReason: .manualBreak
+            ))
+            store.add(focusSession: FocusSession(
+                id: todayFocusID,
+                scheduledFocusSeconds: 1_800,
+                actualFocusSeconds: 1_500,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 13, minute: 0),
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 13, minute: 25),
+                endReason: .scheduledBreak
+            ))
+            store.add(restSession: RestSession(
+                id: hiddenRestID,
+                scheduledRestSeconds: 900,
+                actualRestSeconds: 900,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 14, minute: 0),
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 14, minute: 15),
+                skipped: false,
+                source: .systemSleep
+            ))
+
+            guard let csvPayload = try? store.exportHistory(
+                scope: HistoryExportScope.last7Days,
+                format: .csv,
+                dayBoundaryHour: 0,
+                now: now
+            ) else {
+                return false
+            }
+            guard let csvText = String(data: csvPayload.data, encoding: .utf8) else { return false }
+            guard csvPayload.suggestedFileName == "rhythm-last7Days-2026-04-10.csv" else { return false }
+            guard csvText.contains(todayFocusID.uuidString) else { return false }
+            guard csvText.contains(hiddenRestID.uuidString) else { return false }
+            guard csvText.contains(oldFocusID.uuidString) == false else { return false }
+
+            guard let jsonPayload = try? store.exportHistory(
+                scope: HistoryExportScope.today,
+                format: .json,
+                dayBoundaryHour: 0,
+                now: now
+            ) else {
+                return false
+            }
+            guard let object = try? JSONSerialization.jsonObject(with: jsonPayload.data) as? [String: Any] else {
+                return false
+            }
+            guard let scope = object["scope"] as? [String: Any] else { return false }
+            guard scope["kind"] as? String == "today" else { return false }
+            guard object["dayBoundaryHour"] as? Int == 0 else { return false }
+            guard let sessions = object["sessions"] as? [[String: Any]] else { return false }
+            guard sessions.count == 2 else { return false }
+            let ids = sessions.compactMap { $0["sessionID"] as? String }
+            guard ids.contains(todayFocusID.uuidString) else { return false }
+            guard ids.contains(hiddenRestID.uuidString) else { return false }
+
+            let selectedDayStart = makeUTCDate(year: 2026, month: 4, day: 10, hour: 0, minute: 0)
+            let preview = store.exportPreview(
+                scope: HistoryExportScope.reportingDay(startDate: selectedDayStart),
+                dayBoundaryHour: 0,
+                now: now
+            )
+            guard preview.sessionCount == 2 else { return false }
+
+            guard let selectedDayPayload = try? store.exportHistory(
+                scope: HistoryExportScope.reportingDay(startDate: selectedDayStart),
+                format: .json,
+                dayBoundaryHour: 0,
+                now: now
+            ) else {
+                return false
+            }
+            guard selectedDayPayload.suggestedFileName == "rhythm-selectedDay-2026-04-10.json" else { return false }
+            guard let selectedDayObject = try? JSONSerialization.jsonObject(with: selectedDayPayload.data) as? [String: Any] else {
+                return false
+            }
+            guard let selectedDayScope = selectedDayObject["scope"] as? [String: Any] else { return false }
+            guard selectedDayScope["kind"] as? String == "reportingDay" else { return false }
+            guard selectedDayScope["reportingDayStart"] as? String == "2026-04-10T00:00:00Z" else { return false }
+            guard let selectedDaySessions = selectedDayObject["sessions"] as? [[String: Any]] else { return false }
+            return selectedDaySessions.count == 2
+        }
+
         if includeUI {
             failures += run("overlay smoke is visible and focusable") {
                 runOverlayFocusSmokeCheck()
