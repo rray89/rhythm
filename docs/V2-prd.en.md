@@ -155,7 +155,7 @@ Without turning the menu into a dense analytics surface, the fork now ships ligh
 The shipped UI keeps this compact:
 
 - the menu keeps inline focus/rest totals for today plus an entry point into Insights
-- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries with compact inline totals and explicit range labels
+- the Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries with compact inline totals and explicit range labels that follow the reporting-day cutoff
 - the Insights window keeps fixed rolling charts, browses sessions one reporting day at a time, keeps hidden rest out of the list by default, and can export preset ranges plus the selected reporting day as CSV or JSON
 - a configurable day cutoff hour lets totals and grouping roll over later than midnight
 

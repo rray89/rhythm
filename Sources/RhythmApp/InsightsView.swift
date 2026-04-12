@@ -417,8 +417,21 @@ struct InsightsView: View {
     }
 
     private func rangeLabel(for snapshot: HistoryRangeSnapshot) -> String {
-        let endDate = snapshot.endDate.addingTimeInterval(-1)
+        let endDate = displayRangeEndDate(for: snapshot)
         return "\(rangeBoundaryLabel(for: snapshot.startDate, compareTo: endDate)) - \(rangeBoundaryLabel(for: endDate, compareTo: snapshot.startDate))"
+    }
+
+    private func displayRangeEndDate(for snapshot: HistoryRangeSnapshot) -> Date {
+        guard let lastBucket = snapshot.trendBuckets.last else {
+            return snapshot.endDate.addingTimeInterval(-1)
+        }
+
+        switch lastBucket.unit {
+        case .day:
+            return lastBucket.startDate
+        case .week:
+            return lastBucket.endDate.addingTimeInterval(-1)
+        }
     }
 
     private func rangeBoundaryLabel(for date: Date, compareTo otherDate: Date) -> String {
@@ -804,6 +817,7 @@ private struct TrendBucketsView: View {
 
     private let barSpacing: CGFloat = 6
     private let maxBarHeight: CGFloat = 126
+    private let edgePadding: CGFloat = 18
 
     private var barWidth: CGFloat {
         switch labelStyle {
@@ -821,7 +835,7 @@ private struct TrendBucketsView: View {
     }
 
     private var contentWidth: CGFloat {
-        CGFloat(buckets.count) * barWidth + CGFloat(max(buckets.count - 1, 0)) * barSpacing
+        CGFloat(buckets.count) * barWidth + CGFloat(max(buckets.count - 1, 0)) * barSpacing + edgePadding * 2
     }
 
     var body: some View {
@@ -840,6 +854,7 @@ private struct TrendBucketsView: View {
                     )
                 }
             }
+            .padding(.horizontal, edgePadding)
             .frame(minWidth: contentWidth, alignment: .leading)
             .padding(.vertical, 2)
         }
