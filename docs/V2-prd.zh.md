@@ -223,6 +223,8 @@ fork 现在不再把本地 history 只当作一堆原始 JSON 文件。
 - 活跃计时器的同步应建模为共享的 phase snapshot 与已完成 session 记录，而不是逐秒同步倒计时数字
 - 更稳妥的第一步是只读 companion 视图；远程控制计时器和跨设备冲突处理应该放到后面再设计
 
+Mac App Store 发布准备同样不属于当前 V2 范围。如果未来重新评估，可以先参考这份待办清单：[docs/mac-app-store-checklist.zh.md](mac-app-store-checklist.zh.md)。
+
 ## 7. 验收思路
 
 如果未来把 fork 的 phase 语义正式落地，至少应满足：

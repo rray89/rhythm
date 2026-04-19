@@ -58,6 +58,20 @@ swift run Rhythm
 
 > Note: this must run on macOS. On first launch, the system may ask for permissions related to always-on-top windows or accessibility depending on macOS behavior.
 
+If you want a clickable local app bundle instead of running from Xcode or `swift run`, use:
+
+```bash
+SKIP_DMG=1 ./scripts/package_dmg.sh
+```
+
+This refreshes `dist/Rhythm.app` so you can launch it directly. To also create a DMG for local sharing or drag-install testing:
+
+```bash
+./scripts/package_dmg.sh 0.1.0
+```
+
+This script is a local/direct-distribution helper. It uses an ad-hoc signature and is not the App Store or notarized release flow.
+
 ## TDD Regression Checks
 
 ```bash

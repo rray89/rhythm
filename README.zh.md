@@ -58,6 +58,20 @@ swift run Rhythm
 
 > 注意：需要在 macOS 环境运行。首次运行可能需要在系统设置中允许应用窗口置顶或辅助功能能力（取决于系统策略）。
 
+如果你不想每次都通过 Xcode 或 `swift run` 启动，也可以直接打一个可点击启动的本地 app bundle：
+
+```bash
+SKIP_DMG=1 ./scripts/package_dmg.sh
+```
+
+这会刷新 `dist/Rhythm.app`，之后可以直接启动。如果你还想顺手生成一个 DMG，方便本地分发或拖拽安装测试：
+
+```bash
+./scripts/package_dmg.sh 0.1.0
+```
+
+这个脚本只是本地 / 直接分发辅助工具。它使用 ad-hoc 签名，不是 App Store，也不是 notarized release 流程。
+
 ## TDD 回归检查
 
 ```bash
