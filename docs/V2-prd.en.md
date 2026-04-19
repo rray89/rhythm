@@ -224,6 +224,8 @@ If Apple companion sync is revisited later, it should still be treated as a sepa
 - active timer sync should be modeled as shared phase snapshots and completed session records, not a per-second countdown stream
 - read-only companion surfaces are the safer first milestone; remote timer control and cross-device conflict resolution should come later
 
+Mac App Store release prep is also outside the current V2 scope. If it is revisited later, use the future checklist in [docs/mac-app-store-checklist.en.md](mac-app-store-checklist.en.md).
+
 ## 7. Acceptance Direction
 
 If the fork's phase-adjustment model is formalized, it should at least satisfy the following:
