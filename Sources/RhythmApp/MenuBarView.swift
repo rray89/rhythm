@@ -337,18 +337,25 @@ struct MenuBarView: View {
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
+                Toggle("", isOn: Binding(
+                    get: { timerEngine.usesDeskBreakForNextScheduledBreak },
+                    set: { timerEngine.setNextScheduledBreakUsesDeskBreak($0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .disabled(timerEngine.mode != .focusing)
+                .help(strings.nextScheduledDeskBreakToggleTitle)
+                .accessibilityLabel(strings.nextScheduledDeskBreakToggleTitle)
+
                 compactAdjustButton(
                     systemImage: "minus",
                     enabled: settingsStore.restSeconds > (SettingsStore.restPresetSeconds.first ?? SettingsStore.minRestSeconds),
                     action: decreaseRestDuration
                 )
 
-                Button(action: toggleNextScheduledBreakKind) {
-                    compactSettingValue(breakDurationRowValue)
-                }
-                .buttonStyle(.borderless)
-                .disabled(timerEngine.mode != .focusing)
+                compactSettingValue(strings.breakDurationValue(settingsStore.restSeconds), width: 76)
 
                 compactAdjustButton(
                     systemImage: "plus",
@@ -356,17 +363,17 @@ struct MenuBarView: View {
                     action: increaseRestDuration
                 )
             }
-            .frame(width: 154, alignment: .trailing)
+            .frame(width: 184, alignment: .trailing)
         }
         .font(.subheadline)
     }
 
     @ViewBuilder
-    private func compactSettingValue(_ value: String) -> some View {
+    private func compactSettingValue(_ value: String, width: CGFloat = 96) -> some View {
         Text(value)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
-            .frame(width: 96, alignment: .center)
+            .frame(width: width, alignment: .center)
             .monospacedDigit()
             .foregroundStyle(.secondary)
     }
@@ -463,21 +470,6 @@ struct MenuBarView: View {
             return
         }
         settingsStore.restSeconds = previous
-    }
-
-    private var breakDurationRowValue: String {
-        if timerEngine.mode == .focusing {
-            return strings.nextScheduledBreakValue(
-                seconds: settingsStore.restSeconds,
-                usesDeskBreak: timerEngine.usesDeskBreakForNextScheduledBreak
-            )
-        }
-
-        return strings.breakDurationValue(settingsStore.restSeconds)
-    }
-
-    private func toggleNextScheduledBreakKind() {
-        timerEngine.setNextScheduledBreakUsesDeskBreak(!timerEngine.usesDeskBreakForNextScheduledBreak)
     }
 
     private func increaseDayBoundaryHour() {
