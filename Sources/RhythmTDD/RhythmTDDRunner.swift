@@ -994,6 +994,94 @@ struct RhythmTDDRunner {
             return notifier.notifiedKinds.isEmpty
         }
 
+        failures += run("focus ending soon notification fires once per five minute crossing") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_810))
+            let settings = FakeSettings(focusSeconds: 600, restSeconds: 90)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+            let notifier = FakeBreakNotifier()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                breakNotifier: notifier,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(299)
+            engine.processTick(now: clock.now)
+            guard notifier.focusEndingSoonRemainingSeconds.isEmpty else { return false }
+
+            clock.now = clock.now.addingTimeInterval(1)
+            engine.processTick(now: clock.now)
+            guard notifier.focusEndingSoonRemainingSeconds == [300] else { return false }
+
+            clock.now = clock.now.addingTimeInterval(1)
+            engine.processTick(now: clock.now)
+            guard notifier.focusEndingSoonRemainingSeconds == [300] else { return false }
+
+            engine.extendFocus(by: 300)
+            guard engine.secondsUntilBreak == 599 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(299)
+            engine.processTick(now: clock.now)
+
+            return notifier.focusEndingSoonRemainingSeconds == [300, 300]
+        }
+
+        failures += run("standard overlay rest can switch to desk break and keep remaining timer") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_820))
+            let settings = FakeSettings(focusSeconds: 8, restSeconds: 600)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+            let notifier = FakeBreakNotifier()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                breakNotifier: notifier,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(8)
+            engine.processTick(now: clock.now)
+            guard engine.mode == .resting else { return false }
+            guard engine.activeBreakKind == .standard else { return false }
+            guard overlay.visiblePresentCount == 1 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(120)
+            engine.processTick(now: clock.now)
+            overlay.fireSwitchToDeskBreak()
+
+            guard engine.mode == .resting else { return false }
+            guard engine.activeBreakKind == .desk else { return false }
+            guard engine.secondsRemainingInPhase == 480 else { return false }
+            guard overlay.dismissCallCount == 1 else { return false }
+            guard sessions.captured.isEmpty else { return false }
+
+            clock.now = clock.now.addingTimeInterval(480)
+            engine.processTick(now: clock.now)
+
+            guard engine.mode == .focusing else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].breakKind == .desk else { return false }
+            guard sessions.captured[0].scheduledRestSeconds == 600 else { return false }
+            guard sessions.captured[0].actualRestSeconds == 600 else { return false }
+            return notifier.notifiedKinds == [.desk]
+        }
+
         failures += run("screen lock during break stores timer rest plus hidden lock rest") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 1_850))
             let settings = FakeSettings(focusSeconds: 5, restSeconds: 30)
@@ -1780,6 +1868,7 @@ private final class FakeSessionStore: SessionRecording {
 private final class FakeOverlay: RestOverlaying {
     var onSkipped: (() -> Void)?
     var onExtendRequested: ((Int) -> Void)?
+    var onSwitchToDeskBreakRequested: (() -> Void)?
     private(set) var dismissCallCount = 0
     private(set) var lastPresentedRestSeconds: Int?
     private(set) var lastPresentedBreakKind: BreakKind?
@@ -1806,14 +1895,23 @@ private final class FakeOverlay: RestOverlaying {
     func skipByEscape() {
         onSkipped?()
     }
+
+    func fireSwitchToDeskBreak() {
+        onSwitchToDeskBreakRequested?()
+    }
 }
 
 @MainActor
 private final class FakeBreakNotifier: BreakCompletionNotifying {
     private(set) var notifiedKinds: [BreakKind] = []
+    private(set) var focusEndingSoonRemainingSeconds: [Int] = []
 
     func notifyBreakCompleted(kind: BreakKind) {
         notifiedKinds.append(kind)
+    }
+
+    func notifyFocusEndingSoon(remainingSeconds: Int) {
+        focusEndingSoonRemainingSeconds.append(remainingSeconds)
     }
 }
 

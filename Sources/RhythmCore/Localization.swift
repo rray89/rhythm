@@ -345,6 +345,10 @@ public struct AppStrings {
         localized(chinese: "桌前休息", english: "Desk break")
     }
 
+    public var switchToDeskBreakButton: String {
+        localized(chinese: "改为桌前休息", english: "Switch to Desk break")
+    }
+
     public func breakPresetTitle(_ kind: BreakKind) -> String {
         switch kind {
         case .standard:
@@ -474,6 +478,17 @@ public struct AppStrings {
         case .standard, .meal, .gym, .nap, .errand:
             return localized(chinese: "Rhythm 已恢复专注计时。", english: "Rhythm has resumed focus time.")
         }
+    }
+
+    public var focusEndingSoonNotificationTitle: String {
+        localized(chinese: "还有 5 分钟进入休息", english: "Break in 5 minutes")
+    }
+
+    public func focusEndingSoonNotificationBody(remainingSeconds: Int) -> String {
+        localized(
+            chinese: "当前专注还剩 \(compactDurationLabel(remainingSeconds))。",
+            english: "Your current focus has \(compactDurationLabel(remainingSeconds)) remaining."
+        )
     }
 
     public func weekdayTrendLabel(_ weekday: Int) -> String {

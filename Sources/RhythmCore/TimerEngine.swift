@@ -9,6 +9,7 @@ public enum RhythmMode: Equatable {
 public protocol RestOverlaying: AnyObject {
     var onSkipped: (() -> Void)? { get set }
     var onExtendRequested: ((Int) -> Void)? { get set }
+    var onSwitchToDeskBreakRequested: (() -> Void)? { get set }
     func present(restSeconds: Int, breakKind: BreakKind)
     func updateRemaining(restSeconds: Int)
     func dismiss()
@@ -18,6 +19,7 @@ public protocol RestOverlaying: AnyObject {
 @MainActor
 public protocol BreakCompletionNotifying: AnyObject {
     func notifyBreakCompleted(kind: BreakKind)
+    func notifyFocusEndingSoon(remainingSeconds: Int)
 }
 
 @MainActor
@@ -136,6 +138,8 @@ public final class TimerEngine: ObservableObject {
     private var currentBreakKind: BreakKind?
     private var timer: Timer?
     private var hasPreparedForAppExit = false
+    private var didNotifyFocusEndingSoon = false
+    private let focusEndingSoonThresholdSeconds = 300
 
     public init(
         settingsStore: RhythmSettings,
@@ -167,6 +171,10 @@ public final class TimerEngine: ObservableObject {
 
         overlayManager.onExtendRequested = { [weak self] seconds in
             self?.extendRest(by: seconds)
+        }
+
+        overlayManager.onSwitchToDeskBreakRequested = { [weak self] in
+            self?.switchCurrentRestToDeskBreak()
         }
 
         lockMonitor.onScreenLocked = { [weak self] in
@@ -284,6 +292,9 @@ public final class TimerEngine: ObservableObject {
         guard mode == .focusing, screenLockStartedAt == nil, systemSleepStartedAt == nil, seconds > 0 else { return }
         currentFocusTargetSeconds += seconds
         processTick(now: nowProvider())
+        if secondsUntilBreak > focusEndingSoonThresholdSeconds {
+            didNotifyFocusEndingSoon = false
+        }
         notifyLifecycleStateChanged()
     }
 
@@ -311,6 +322,21 @@ public final class TimerEngine: ObservableObject {
         notifyLifecycleStateChanged()
     }
 
+    public func switchCurrentRestToDeskBreak() {
+        guard mode == .resting, screenLockStartedAt == nil, systemSleepStartedAt == nil else { return }
+        guard (currentBreakKind ?? .standard).usesBlockingOverlay else { return }
+
+        let remaining = restRemainingSeconds(at: nowProvider())
+        guard remaining > 0 else { return }
+
+        currentBreakKind = .desk
+        activeBreakKind = .desk
+        secondsRemainingInPhase = remaining
+        overlayManager.dismiss()
+        overlayManager.present(restSeconds: remaining, breakKind: .desk)
+        notifyLifecycleStateChanged()
+    }
+
     public func processTick(now: Date) {
         guard screenLockStartedAt == nil, systemSleepStartedAt == nil else {
             return
@@ -321,6 +347,7 @@ public final class TimerEngine: ObservableObject {
             let remaining = focusRemainingSeconds(at: now)
             secondsUntilBreak = remaining
             secondsRemainingInPhase = remaining
+            notifyFocusEndingSoonIfNeeded(remaining: remaining)
 
             if remaining == 0 {
                 beginScheduledRest(at: now)
@@ -463,6 +490,7 @@ public final class TimerEngine: ObservableObject {
 
         cycleStartedAt = startedAt
         currentFocusTargetSeconds = settingsStore.focusSeconds
+        didNotifyFocusEndingSoon = false
         mode = .focusing
         secondsUntilBreak = currentFocusTargetSeconds
         secondsRemainingInPhase = currentFocusTargetSeconds
@@ -604,6 +632,15 @@ public final class TimerEngine: ObservableObject {
         }
 
         onLifecycleStateChanged?()
+    }
+
+    private func notifyFocusEndingSoonIfNeeded(remaining: Int) {
+        guard !didNotifyFocusEndingSoon else { return }
+        guard currentFocusTargetSeconds > focusEndingSoonThresholdSeconds else { return }
+        guard remaining > 0, remaining <= focusEndingSoonThresholdSeconds else { return }
+
+        didNotifyFocusEndingSoon = true
+        breakNotifier?.notifyFocusEndingSoon(remainingSeconds: focusEndingSoonThresholdSeconds)
     }
 
     private func focusRemainingSeconds(at now: Date) -> Int {
