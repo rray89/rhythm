@@ -10,6 +10,7 @@ final class OverlayManager: ObservableObject {
 
     var onSkipped: (() -> Void)?
     var onExtendRequested: ((Int) -> Void)?
+    var onSwitchToDeskBreakRequested: (() -> Void)?
 
     private var overlayWindow: OverlayWindow?
     private var keyMonitor: Any?
@@ -218,6 +219,14 @@ private struct OverlayView: View {
                 .keyboardShortcut(.cancelAction)
                 .buttonStyle(.borderedProminent)
                 .tint(.white.opacity(0.2))
+
+                if model.activeBreakKind.usesBlockingOverlay {
+                    Button(strings.switchToDeskBreakButton) {
+                        model.onSwitchToDeskBreakRequested?()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.white.opacity(0.18))
+                }
             }
         }
     }

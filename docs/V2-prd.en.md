@@ -81,9 +81,11 @@ The fork keeps the phase-control model already explored in the branch work:
   - start break 5 minutes early
   - extend focus by 5 minutes
   - extend focus by 10 minutes
+  - notify once when the current focus phase reaches the final 5 minutes, using the default system notification sound when allowed
 - During break:
   - extend break by 1 minute
   - extend break by 5 minutes
+  - switch a blocking regular break into `Desk break` while preserving the same remaining timer
 
 The design principles behind this model are:
 
@@ -116,6 +118,7 @@ Near-term expectations:
 - the status item should show the current countdown in both focus and break states without obvious width jitter
 - the status item should not quietly disappear because of UI or system edge cases
 - if something does go wrong, the app should prefer restoring the menu bar entry instead of forcing the user to restart
+- launching a second Rhythm copy, including a packaged build while an Xcode/debug build is already running or vice versa, should activate the existing instance and terminate the duplicate
 
 ## 5. Near-Term Directions
 
@@ -138,6 +141,7 @@ The current shipped rest model is intentionally simpler than the earlier long-br
 
 - regular short breaks remain configurable and can now go up to 20 minutes
 - `Desk break` is the deliberate on-screen, non-work break for watching a video, reading posts, or similar casual use
+- a regular full-screen break can be converted into `Desk break` without restarting the break timer
 - when `Desk break` ends, Rhythm returns to focus automatically and should notify the user when notification permissions allow
 - away-from-desk time is represented by locking the Mac, which is counted as hidden rest until unlock
 
@@ -235,15 +239,18 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 3. `Start Break 5 Minutes Early` is unavailable when fewer than 5 minutes remain
 4. The current break phase can be extended safely by 1 or 5 minutes
 5. Session history records the final planned break duration for that cycle, not the stale default value
-6. The menu bar entry remains visible or recoverable in common failure scenarios
-7. The menu bar entry keeps the icon and shows a live countdown in both focus and break states without obvious jitter
-8. `Desk break` can continue without a blocking overlay
-9. Daily totals stay compact in the menu while deeper history and export live in the dedicated Insights window
-10. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
-11. System sleep contributes hidden rest and starts a fresh focus cycle after wake or unlock, depending on whether wake lands locked
-12. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
-13. Hidden rest counts in totals, trends, and export, but stays out of the default session list unless explicitly revealed
-14. Export supports explicit Today, Last 7 Days, Last 30 Days, All Time, and selected reporting-day scopes in both CSV and JSON
+6. Focus warning notification fires once when a focus phase reaches the final 5 minutes and can fire again after an extension pushes the same focus phase back above the threshold
+7. A blocking regular break can switch to `Desk break` without resetting the remaining timer
+8. The menu bar entry remains visible or recoverable in common failure scenarios
+9. The menu bar entry keeps the icon and shows a live countdown in both focus and break states without obvious jitter
+10. A duplicate launch should not leave two Rhythm timers running at the same time
+11. `Desk break` can continue without a blocking overlay
+12. Daily totals stay compact in the menu while deeper history and export live in the dedicated Insights window
+13. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
+14. System sleep contributes hidden rest and starts a fresh focus cycle after wake or unlock, depending on whether wake lands locked
+15. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
+16. Hidden rest counts in totals, trends, and export, but stays out of the default session list unless explicitly revealed
+17. Export supports explicit Today, Last 7 Days, Last 30 Days, All Time, and selected reporting-day scopes in both CSV and JSON
 
 ## 8. Open Questions
 
