@@ -10,3 +10,6 @@ dist/
 DerivedData/
 xcuserdata/
 *.xcworkspace
+
+# Local AI handoff notes
+.progress/
