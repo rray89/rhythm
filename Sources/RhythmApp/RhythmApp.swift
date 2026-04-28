@@ -16,6 +16,7 @@ final class RhythmAppDelegate: NSObject, NSApplicationDelegate {
         super.init()
 
         guard !isPrimaryInstance else { return }
+        NSApp.setActivationPolicy(.prohibited)
         DispatchQueue.main.async {
             NSApp.terminate(nil)
         }
@@ -53,6 +54,8 @@ final class RhythmAppDelegate: NSObject, NSApplicationDelegate {
 
 @MainActor
 private final class SingleInstanceCoordinator {
+    private static let fallbackExecutableName = "Rhythm"
+
     private let lockPath = NSTemporaryDirectory() + "com.xiao2dou.rhythm.single-instance.lock"
     private var lockFileDescriptor: CInt = -1
 
@@ -61,19 +64,28 @@ private final class SingleInstanceCoordinator {
             return true
         }
 
+        if activateExistingInstanceIfNeeded() {
+            return false
+        }
+
         let fileDescriptor = open(lockPath, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
         guard fileDescriptor >= 0 else {
-            return true
+            return !activateExistingInstanceIfNeeded()
         }
 
         guard flock(fileDescriptor, LOCK_EX | LOCK_NB) == 0 else {
             close(fileDescriptor)
-            activateExistingInstance()
+            activateExistingInstanceIfNeeded()
+            return false
+        }
+
+        if activateExistingInstanceIfNeeded() {
+            flock(fileDescriptor, LOCK_UN)
+            close(fileDescriptor)
             return false
         }
 
         lockFileDescriptor = fileDescriptor
-        recordCurrentProcessID(fileDescriptor)
         return true
     }
 
@@ -86,29 +98,22 @@ private final class SingleInstanceCoordinator {
         close(lockFileDescriptor)
     }
 
-    private func recordCurrentProcessID(_ fileDescriptor: CInt) {
-        let processID = "\(getpid())\n"
-        ftruncate(fileDescriptor, 0)
-        lseek(fileDescriptor, 0, SEEK_SET)
-        _ = processID.withCString { pointer in
-            write(fileDescriptor, pointer, strlen(pointer))
-        }
-    }
-
-    private func activateExistingInstance() {
+    @discardableResult
+    private func activateExistingInstanceIfNeeded() -> Bool {
         let policy = SingleInstancePolicy(
             bundleIdentifier: Bundle.main.bundleIdentifier,
-            executableName: Bundle.main.executableURL?.lastPathComponent ?? "Rhythm",
+            executableName: Bundle.main.executableURL?.lastPathComponent ?? Self.fallbackExecutableName,
             processIdentifier: getpid()
         )
         let snapshots = NSWorkspace.shared.runningApplications.map(RunningApplicationSnapshot.init)
 
         guard let existing = policy.existingInstance(in: snapshots) else {
-            return
+            return false
         }
 
         NSRunningApplication(processIdentifier: existing.processIdentifier)?
             .activate(options: [.activateIgnoringOtherApps])
+        return true
     }
 }
 

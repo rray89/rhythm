@@ -1108,6 +1108,14 @@ struct RhythmTDDRunner {
             )
             guard policy.existingInstance(in: [debugNameMatch]) == debugNameMatch else { return false }
 
+            let localizedNameOnlyMatch = RunningApplicationSnapshot(
+                processIdentifier: 11,
+                bundleIdentifier: nil,
+                localizedName: "Rhythm",
+                executableLastPathComponent: "Rhythm-Debug"
+            )
+            guard policy.existingInstance(in: [localizedNameOnlyMatch]) == localizedNameOnlyMatch else { return false }
+
             let currentProcess = RunningApplicationSnapshot(
                 processIdentifier: currentPID,
                 bundleIdentifier: "com.xiao2dou.rhythm",
