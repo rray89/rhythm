@@ -1169,6 +1169,47 @@ struct RhythmTDDRunner {
             return policy.existingInstance(in: [swiftRunWrapper]) == nil
         }
 
+        failures += run("single instance policy lists every duplicate rhythm instance") {
+            let currentPID: Int32 = 42
+            let policy = SingleInstancePolicy(
+                bundleIdentifier: "com.xiao2dou.rhythm",
+                executableName: "Rhythm",
+                processIdentifier: currentPID
+            )
+
+            let currentProcess = RunningApplicationSnapshot(
+                processIdentifier: currentPID,
+                bundleIdentifier: "com.xiao2dou.rhythm",
+                localizedName: "Rhythm",
+                executableLastPathComponent: "Rhythm"
+            )
+            let packagedMatch = RunningApplicationSnapshot(
+                processIdentifier: 7,
+                bundleIdentifier: "com.xiao2dou.rhythm",
+                localizedName: "Rhythm",
+                executableLastPathComponent: "Rhythm"
+            )
+            let debugMatch = RunningApplicationSnapshot(
+                processIdentifier: 8,
+                bundleIdentifier: nil,
+                localizedName: nil,
+                executableLastPathComponent: "Rhythm"
+            )
+            let unrelatedSwiftWrapper = RunningApplicationSnapshot(
+                processIdentifier: 9,
+                bundleIdentifier: nil,
+                localizedName: "swift",
+                executableLastPathComponent: "swift"
+            )
+
+            return policy.duplicateInstances(in: [
+                currentProcess,
+                packagedMatch,
+                unrelatedSwiftWrapper,
+                debugMatch
+            ]) == [packagedMatch, debugMatch]
+        }
+
         failures += run("screen lock during break stores timer rest plus hidden lock rest") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 1_850))
             let settings = FakeSettings(focusSeconds: 5, restSeconds: 30)

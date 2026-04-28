@@ -1,4 +1,4 @@
-import AppKit
+@preconcurrency import AppKit
 import Darwin
 import RhythmCore
 import SwiftUI
@@ -40,6 +40,7 @@ final class RhythmAppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.setActivationPolicy(.accessory)
         _ = appModel
+        singleInstanceCoordinator.startMonitoringDuplicateLaunches()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -58,6 +59,7 @@ private final class SingleInstanceCoordinator {
 
     private let lockPath = NSTemporaryDirectory() + "com.xiao2dou.rhythm.single-instance.lock"
     private var lockFileDescriptor: CInt = -1
+    private var launchObserver: NSObjectProtocol?
 
     func acquireOrActivateExistingInstance() -> Bool {
         guard lockFileDescriptor == -1 else {
@@ -89,7 +91,30 @@ private final class SingleInstanceCoordinator {
         return true
     }
 
+    func startMonitoringDuplicateLaunches() {
+        guard launchObserver == nil else {
+            enforceSingleInstance()
+            return
+        }
+
+        enforceSingleInstance()
+
+        launchObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.enforceSingleInstance()
+            }
+        }
+    }
+
     deinit {
+        if let launchObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(launchObserver)
+        }
+
         guard lockFileDescriptor >= 0 else {
             return
         }
@@ -100,11 +125,7 @@ private final class SingleInstanceCoordinator {
 
     @discardableResult
     private func activateExistingInstanceIfNeeded() -> Bool {
-        let policy = SingleInstancePolicy(
-            bundleIdentifier: Bundle.main.bundleIdentifier,
-            executableName: Bundle.main.executableURL?.lastPathComponent ?? Self.fallbackExecutableName,
-            processIdentifier: getpid()
-        )
+        let policy = currentPolicy()
         let snapshots = NSWorkspace.shared.runningApplications.map(RunningApplicationSnapshot.init)
 
         guard let existing = policy.existingInstance(in: snapshots) else {
@@ -114,6 +135,34 @@ private final class SingleInstanceCoordinator {
         NSRunningApplication(processIdentifier: existing.processIdentifier)?
             .activate(options: [.activateIgnoringOtherApps])
         return true
+    }
+
+    private func enforceSingleInstance() {
+        let policy = currentPolicy()
+        let runningApplications = NSWorkspace.shared.runningApplications
+        let duplicateProcessIDs = Set(
+            policy
+                .duplicateInstances(in: runningApplications.map(RunningApplicationSnapshot.init))
+                .map(\.processIdentifier)
+        )
+
+        guard !duplicateProcessIDs.isEmpty else {
+            return
+        }
+
+        for application in runningApplications where duplicateProcessIDs.contains(application.processIdentifier) {
+            application.terminate()
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func currentPolicy() -> SingleInstancePolicy {
+        SingleInstancePolicy(
+            bundleIdentifier: Bundle.main.bundleIdentifier,
+            executableName: Bundle.main.executableURL?.lastPathComponent ?? Self.fallbackExecutableName,
+            processIdentifier: getpid()
+        )
     }
 }
 

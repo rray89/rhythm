@@ -41,7 +41,7 @@ This README describes the behavior currently shipped in this fork. If you want t
   - regular breaks use a full-screen translucent overlay, can be ended early with `ESC`, or can be switched into a non-blocking `Desk break` while keeping the same remaining timer
   - `Desk break` stays non-blocking, keeps the Mac usable, continues counting down in the menu, and automatically returns to focus with a completion notification when possible
 - Local history: focus and rest sessions, planned durations, actual durations, and end reasons are stored in weekly JSON history under `Application Support/Rhythm/history/weeks/`; the Insights window keeps fixed-range charts, uses monthly aggregation for `All Time`, browses sessions one reporting day at a time, and exports `Today`, `Last 7 Days`, `Last 30 Days`, `All Time`, or the selected reporting day as CSV or JSON; app-off recovery state lives in `Application Support/Rhythm/state/app-lifecycle.json`
-- Menu bar app: stays in the status bar, keeps the icon visible, shows a live countdown for quick status checks and recent history, and prevents two Rhythm copies from running at the same time
+- Menu bar app: stays in the status bar, keeps the icon visible, shows a live countdown for quick status checks and recent history, and prevents two Rhythm copies from running at the same time, including later duplicate launches from local builds
 - Launch at login: can be enabled or disabled from the menu after the app is installed normally
 
 ## Tech Stack
@@ -92,7 +92,7 @@ This command runs repeatable regression coverage for:
 - hidden screen-lock rest and fresh focus after unlock
 - hidden sleep rest for sleep/wake and wake-to-lock flows
 - hidden app-off rest, heartbeat fallback recovery, and the 12-hour cap
-- single-instance duplicate launch detection
+- single-instance duplicate launch detection and duplicate cleanup
 - overlay visibility and focus smoke coverage
 
 To temporarily skip the UI smoke coverage:
