@@ -10,6 +10,8 @@
    - verification steps
    - risk and rollback notes
 
+Quit any running Rhythm copy before starting a dev build. Rhythm keeps the first running instance as primary, so `swift run Rhythm`, Xcode builds, and `dist/Rhythm.app` will exit if another Rhythm copy is already active.
+
 ## Code Style
 
 - Keep logic modular (`TimerEngine`, `OverlayManager`, `LockMonitor`)
