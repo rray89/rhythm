@@ -48,9 +48,9 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - first-run language defaults to Chinese only for `zh*` system languages, and to English otherwise
    - future user-facing features are expected to remain bilingual by default
 7. The fork now ships a lighter rest model and local history baseline:
-   - the regular break default can be set up to 20 minutes
+   - the regular break default can be set up to 60 minutes
    - `Desk break` is the single explicit on-screen non-work break action in the menu
-   - `Desk break` is intentionally non-blocking and continues in the menu without forcing a full-screen overlay
+   - `Desk break` is intentionally non-blocking, continues in the menu without forcing a full-screen overlay, and can send a final-5-minute warning
    - screen lock now counts as hidden away-from-screen rest until unlock, then starts a fresh focus cycle
    - system sleep without prior lock now also counts as hidden away-from-screen rest, ending at wake or continuing until unlock if wake lands on a locked screen
    - app-off time after normal quit or shutdown is counted as hidden rest on next launch, with a 15-minute heartbeat fallback for unclean exits and a 12-hour cap per gap
@@ -86,6 +86,7 @@ The fork keeps the phase-control model already explored in the branch work:
   - extend break by 1 minute
   - extend break by 5 minutes
   - switch a blocking regular break into `Desk break` while preserving the same remaining timer
+  - notify once when the current `Desk break` reaches the final 5 minutes, using the default system notification sound when allowed
 
 The design principles behind this model are:
 
@@ -139,10 +140,10 @@ Current expectations:
 
 The current shipped rest model is intentionally simpler than the earlier long-break preset matrix:
 
-- regular short breaks remain configurable and can now go up to 20 minutes
+- regular short breaks remain configurable and can now go up to 60 minutes
 - `Desk break` is the deliberate on-screen, non-work break for watching a video, reading posts, or similar casual use
 - a regular full-screen break can be converted into `Desk break` without restarting the break timer
-- when `Desk break` ends, Rhythm returns to focus automatically and should notify the user when notification permissions allow
+- when a `Desk break` longer than 5 minutes enters the final 5 minutes, Rhythm should notify once; when `Desk break` ends, Rhythm returns to focus automatically and should notify the user when notification permissions allow
 - away-from-desk time is represented by locking the Mac, which is counted as hidden rest until unlock
 
 This keeps one clear on-screen break action while letting real away time follow normal screen-lock behavior.
@@ -245,12 +246,13 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 9. The menu bar entry keeps the icon and shows a live countdown in both focus and break states without obvious jitter
 10. A duplicate launch, including a later launch after the primary app is already running, should not leave two Rhythm timers running at the same time
 11. `Desk break` can continue without a blocking overlay
-12. Daily totals stay compact in the menu while deeper history and export live in the dedicated Insights window
-13. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
-14. System sleep contributes hidden rest and starts a fresh focus cycle after wake or unlock, depending on whether wake lands locked
-15. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
-16. Hidden rest counts in totals, trends, and export, but stays out of the default session list unless explicitly revealed
-17. Export supports explicit Today, Last 7 Days, Last 30 Days, All Time, and selected reporting-day scopes in both CSV and JSON
+12. `Desk break` warning notification fires once when a Desk break longer than 5 minutes reaches the final 5 minutes and can fire again after an extension pushes the same Desk break back above the threshold
+13. Daily totals stay compact in the menu while deeper history and export live in the dedicated Insights window
+14. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
+15. System sleep contributes hidden rest and starts a fresh focus cycle after wake or unlock, depending on whether wake lands locked
+16. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
+17. Hidden rest counts in totals, trends, and export, but stays out of the default session list unless explicitly revealed
+18. Export supports explicit Today, Last 7 Days, Last 30 Days, All Time, and selected reporting-day scopes in both CSV and JSON
 
 ## 8. Open Questions
 

@@ -478,8 +478,8 @@ public final class SettingsStore: ObservableObject {
     public static let focusMinutesStep = 5
 
     public static let minRestSeconds = 30
-    public static let maxRestSeconds = 1_200
-    public static let restPresetSeconds = [30, 60, 90, 120, 180, 240, 300, 600, 900, 1_200]
+    public static let maxRestSeconds = 3_600
+    public static let restPresetSeconds = [30, 60, 90, 120, 180, 240, 300, 600, 900, 1_200, 1_800, 2_700, 3_600]
 
     public static let minDayBoundaryHour = 0
     public static let maxDayBoundaryHour = 23

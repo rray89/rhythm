@@ -38,6 +38,14 @@ final class BreakNotificationManager: BreakCompletionNotifying {
         )
     }
 
+    func notifyBreakEndingSoon(kind: BreakKind, remainingSeconds: Int) {
+        sendNotification(
+            identifierPrefix: "rhythm.break-ending-soon.\(kind.rawValue)",
+            title: { $0.breakEndingSoonNotificationTitle(for: kind) },
+            body: { $0.breakEndingSoonNotificationBody(for: kind, remainingSeconds: remainingSeconds) }
+        )
+    }
+
     private func sendNotification(
         identifierPrefix: String,
         title: @escaping (AppStrings) -> String,

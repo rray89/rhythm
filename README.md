@@ -25,21 +25,21 @@ This README describes the behavior currently shipped in this fork. If you want t
 
 ## Current Features
 
-- Custom rhythm: configurable focus interval from 10 to 120 minutes in 5-minute steps, plus configurable break duration from 30 seconds to 20 minutes using common presets
+- Custom rhythm: configurable focus interval from 10 to 120 minutes in 5-minute steps, plus configurable break duration from 30 seconds to 60 minutes using common presets
 - Temporary phase controls: supports `Start Break 5 Minutes Early`, `Extend Focus 5 Minutes`, `Extend Focus 10 Minutes`, and extending the current break phase
 - Bilingual UI: supports `中文` and `English`; first launch defaults to Chinese only for `zh*` system languages, and English otherwise
 - Daily totals: the menu keeps a compact `Today` summary with inline `Focus` / `Rest` totals and a quick path into Insights
 - Insights window: open a dedicated window from the menu for `Today`, `Last 7 Days`, `Last 30 Days`, and `All Time` summaries, compact range totals, a day-based sessions browser, and scoped export; fixed-range charts follow the configured reporting-day cutoff, and `All Time` is aggregated by month
 - Day cutoff: reporting for "today" can be shifted anywhere from `00:00` to `23:00`
 - No-rest mode: automatically skips breaks when enabled and records the skipped break session
-- Focus warning: when an active focus phase reaches the final 5 minutes, Rhythm sends a notification with the default system sound when notification permissions allow
+- Ending-soon warnings: when an active focus phase or `Desk break` reaches the final 5 minutes, Rhythm sends a notification with the default system sound when notification permissions allow
 - Hidden screen-lock rest: locking the screen ends the current focus or break segment, counts lock-to-unlock time as rest, and starts a fresh focus cycle on unlock
 - Hidden sleep rest: if the Mac sleeps without being locked first, Rhythm ends the visible segment at sleep time, counts sleep as hidden rest, and keeps that hidden rest running until unlock if wake lands on a locked screen
 - Hidden app-off rest: normal quit or shutdown records the close time, then the next launch counts that gap as hidden rest; a 15-minute heartbeat provides fallback recovery for unclean exits, capped at 12 hours per gap
 - Desk break: the menu provides a dedicated `Desk break` action for "still on the computer, but not working" scenarios
 - Layered break presentation:
   - regular breaks use a full-screen translucent overlay, can be ended early with `ESC`, or can be switched into a non-blocking `Desk break` while keeping the same remaining timer
-  - `Desk break` stays non-blocking, keeps the Mac usable, continues counting down in the menu, and automatically returns to focus with a completion notification when possible
+  - `Desk break` stays non-blocking, keeps the Mac usable, continues counting down in the menu, sends a final-5-minute warning for breaks longer than 5 minutes, and automatically returns to focus with a completion notification when possible
 - Local history: focus and rest sessions, planned durations, actual durations, and end reasons are stored in weekly JSON history under `Application Support/Rhythm/history/weeks/`; the Insights window keeps fixed-range charts, uses monthly aggregation for `All Time`, browses sessions one reporting day at a time, and exports `Today`, `Last 7 Days`, `Last 30 Days`, `All Time`, or the selected reporting day as CSV or JSON; app-off recovery state lives in `Application Support/Rhythm/state/app-lifecycle.json`
 - Menu bar app: stays in the status bar, keeps the icon visible, shows a live countdown for quick status checks and recent history, and prevents two Rhythm copies from running at the same time, including later duplicate launches from local builds
 - Launch at login: can be enabled or disabled from the menu after the app is installed normally
