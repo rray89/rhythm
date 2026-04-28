@@ -454,6 +454,15 @@ public struct AppStrings {
         }
     }
 
+    public func shortenBreakButton(minutes: Int) -> String {
+        switch language {
+        case .chinese:
+            return "缩短 \(minutes) 分钟"
+        case .english:
+            return "Break -\(minutes)m"
+        }
+    }
+
     public func breakCompletedNotificationTitle(for kind: BreakKind) -> String {
         switch kind {
         case .desk:

@@ -36,6 +36,7 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
 3. The current break phase can also be adjusted directly:
    - `Extend Break 1 Minute`
    - `Extend Break 5 Minutes`
+   - `Desk Break -5 Minutes` while a non-blocking `Desk break` is active
 4. Default settings and current-phase adjustments are treated as different concepts:
    - changing focus interval or break duration affects the next cycle
    - extending or shortening a phase affects only the current phase
@@ -85,6 +86,7 @@ The fork keeps the phase-control model already explored in the branch work:
 - During break:
   - extend break by 1 minute
   - extend break by 5 minutes
+  - shorten an active `Desk break` by 5 minutes when at least 5 minutes remain
   - switch a blocking regular break into `Desk break` while preserving the same remaining timer
   - notify once when the current `Desk break` reaches the final 5 minutes, using the default system notification sound when allowed
 
@@ -238,7 +240,7 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 1. Changing default focus or break settings does not interrupt the current phase
 2. The current focus phase can be extended safely or moved into break earlier
 3. `Start Break 5 Minutes Early` is unavailable when fewer than 5 minutes remain
-4. The current break phase can be extended safely by 1 or 5 minutes
+4. The current break phase can be extended safely by 1 or 5 minutes, and an active `Desk break` can be shortened safely by 5 minutes when at least 5 minutes remain
 5. Session history records the final planned break duration for that cycle, not the stale default value
 6. Focus warning notification fires once when a focus phase reaches the final 5 minutes and can fire again after an extension pushes the same focus phase back above the threshold
 7. A blocking regular break can switch to `Desk break` without resetting the remaining timer

@@ -118,6 +118,14 @@ struct MenuBarView: View {
                 }
 
                 HStack(spacing: 8) {
+                    if currentBreakKind == .desk {
+                        Button(strings.shortenBreakButton(minutes: 5)) {
+                            timerEngine.shortenRest(by: 300)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!timerEngine.canShortenRest(by: 300))
+                    }
+
                     ForEach(currentBreakKind.extensionMinutes, id: \.self) { minutes in
                         Button(strings.extendBreakButton(minutes: minutes)) {
                             timerEngine.extendRest(by: minutes * 60)

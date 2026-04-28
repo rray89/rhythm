@@ -327,6 +327,34 @@ public final class TimerEngine: ObservableObject {
         notifyLifecycleStateChanged()
     }
 
+    public func canShortenRest(by seconds: Int) -> Bool {
+        guard mode == .resting, screenLockStartedAt == nil, systemSleepStartedAt == nil, seconds > 0 else { return false }
+        guard currentBreakKind == .desk else { return false }
+        return restRemainingSeconds(at: nowProvider()) >= seconds
+    }
+
+    public func shortenRest(by seconds: Int) {
+        let now = nowProvider()
+        guard mode == .resting, screenLockStartedAt == nil, systemSleepStartedAt == nil, seconds > 0 else { return }
+        guard currentBreakKind == .desk else { return }
+        guard restRemainingSeconds(at: now) >= seconds else { return }
+
+        currentRestTargetSeconds = max(0, (currentRestTargetSeconds ?? settingsStore.restSeconds) - seconds)
+        let remaining = restRemainingSeconds(at: now)
+        secondsRemainingInPhase = remaining
+        overlayManager.updateRemaining(restSeconds: remaining)
+
+        if remaining == 0 {
+            finishRest(skipped: false, skipReason: nil, endedAt: now)
+            return
+        }
+
+        if remaining <= endingSoonThresholdSeconds {
+            didNotifyBreakEndingSoon = true
+        }
+        notifyLifecycleStateChanged()
+    }
+
     public func switchCurrentRestToDeskBreak() {
         guard mode == .resting, screenLockStartedAt == nil, systemSleepStartedAt == nil else { return }
         guard (currentBreakKind ?? .standard).usesBlockingOverlay else { return }
