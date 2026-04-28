@@ -994,7 +994,7 @@ struct RhythmTDDRunner {
             return notifier.notifiedKinds.isEmpty
         }
 
-        failures += run("focus ending soon notification fires once per five minute crossing") {
+        failures += run("focus ending soon notification reports actual remaining once per five minute crossing") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 1_810))
             let settings = FakeSettings(focusSeconds: 600, restSeconds: 90)
             let sessions = FakeSessionStore()
@@ -1018,21 +1018,21 @@ struct RhythmTDDRunner {
             engine.processTick(now: clock.now)
             guard notifier.focusEndingSoonRemainingSeconds.isEmpty else { return false }
 
-            clock.now = clock.now.addingTimeInterval(1)
+            clock.now = clock.now.addingTimeInterval(5)
             engine.processTick(now: clock.now)
-            guard notifier.focusEndingSoonRemainingSeconds == [300] else { return false }
+            guard notifier.focusEndingSoonRemainingSeconds == [296] else { return false }
 
             clock.now = clock.now.addingTimeInterval(1)
             engine.processTick(now: clock.now)
-            guard notifier.focusEndingSoonRemainingSeconds == [300] else { return false }
+            guard notifier.focusEndingSoonRemainingSeconds == [296] else { return false }
 
             engine.extendFocus(by: 300)
-            guard engine.secondsUntilBreak == 599 else { return false }
+            guard engine.secondsUntilBreak == 595 else { return false }
 
-            clock.now = clock.now.addingTimeInterval(299)
+            clock.now = clock.now.addingTimeInterval(295)
             engine.processTick(now: clock.now)
 
-            return notifier.focusEndingSoonRemainingSeconds == [300, 300]
+            return notifier.focusEndingSoonRemainingSeconds == [296, 300]
         }
 
         failures += run("standard overlay rest can switch to desk break and keep remaining timer") {
@@ -1060,6 +1060,7 @@ struct RhythmTDDRunner {
             guard engine.mode == .resting else { return false }
             guard engine.activeBreakKind == .standard else { return false }
             guard overlay.visiblePresentCount == 1 else { return false }
+            guard overlay.isShowingBlockingOverlay else { return false }
 
             clock.now = clock.now.addingTimeInterval(120)
             engine.processTick(now: clock.now)
@@ -1068,7 +1069,8 @@ struct RhythmTDDRunner {
             guard engine.mode == .resting else { return false }
             guard engine.activeBreakKind == .desk else { return false }
             guard engine.secondsRemainingInPhase == 480 else { return false }
-            guard overlay.dismissCallCount == 1 else { return false }
+            guard overlay.visiblePresentCount == 1 else { return false }
+            guard !overlay.isShowingBlockingOverlay else { return false }
             guard sessions.captured.isEmpty else { return false }
 
             clock.now = clock.now.addingTimeInterval(480)
@@ -1080,6 +1082,63 @@ struct RhythmTDDRunner {
             guard sessions.captured[0].scheduledRestSeconds == 600 else { return false }
             guard sessions.captured[0].actualRestSeconds == 600 else { return false }
             return notifier.notifiedKinds == [.desk]
+        }
+
+        failures += run("single instance policy detects packaged and debug rhythm copies") {
+            let currentPID: Int32 = 42
+            let policy = SingleInstancePolicy(
+                bundleIdentifier: "com.xiao2dou.rhythm",
+                executableName: "Rhythm",
+                processIdentifier: currentPID
+            )
+
+            let packagedMatch = RunningApplicationSnapshot(
+                processIdentifier: 7,
+                bundleIdentifier: "com.xiao2dou.rhythm",
+                localizedName: "Rhythm",
+                executableLastPathComponent: "Rhythm"
+            )
+            guard policy.existingInstance(in: [packagedMatch]) == packagedMatch else { return false }
+
+            let debugNameMatch = RunningApplicationSnapshot(
+                processIdentifier: 8,
+                bundleIdentifier: nil,
+                localizedName: nil,
+                executableLastPathComponent: "Rhythm"
+            )
+            guard policy.existingInstance(in: [debugNameMatch]) == debugNameMatch else { return false }
+
+            let currentProcess = RunningApplicationSnapshot(
+                processIdentifier: currentPID,
+                bundleIdentifier: "com.xiao2dou.rhythm",
+                localizedName: "Rhythm",
+                executableLastPathComponent: "Rhythm"
+            )
+            let unrelated = RunningApplicationSnapshot(
+                processIdentifier: 9,
+                bundleIdentifier: "com.example.other",
+                localizedName: "RhythmTDD",
+                executableLastPathComponent: "RhythmTDD"
+            )
+
+            return policy.existingInstance(in: [currentProcess, unrelated]) == nil
+        }
+
+        failures += run("single instance policy ignores generic swift package executable names") {
+            let policy = SingleInstancePolicy(
+                bundleIdentifier: nil,
+                executableName: "Rhythm",
+                processIdentifier: 42
+            )
+
+            let swiftRunWrapper = RunningApplicationSnapshot(
+                processIdentifier: 10,
+                bundleIdentifier: nil,
+                localizedName: "swift",
+                executableLastPathComponent: "swift"
+            )
+
+            return policy.existingInstance(in: [swiftRunWrapper]) == nil
         }
 
         failures += run("screen lock during break stores timer rest plus hidden lock rest") {
@@ -1874,6 +1933,7 @@ private final class FakeOverlay: RestOverlaying {
     private(set) var lastPresentedBreakKind: BreakKind?
     private(set) var updatedRemainingSeconds: [Int] = []
     private(set) var visiblePresentCount = 0
+    private(set) var isShowingBlockingOverlay = false
 
     func present(restSeconds: Int, breakKind: BreakKind) {
         lastPresentedRestSeconds = restSeconds
@@ -1881,6 +1941,9 @@ private final class FakeOverlay: RestOverlaying {
         updatedRemainingSeconds = [restSeconds]
         if breakKind.usesBlockingOverlay {
             visiblePresentCount += 1
+            isShowingBlockingOverlay = true
+        } else {
+            isShowingBlockingOverlay = false
         }
     }
 
@@ -1890,6 +1953,7 @@ private final class FakeOverlay: RestOverlaying {
 
     func dismiss() {
         dismissCallCount += 1
+        isShowingBlockingOverlay = false
     }
 
     func skipByEscape() {

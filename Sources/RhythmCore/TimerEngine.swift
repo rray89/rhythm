@@ -332,7 +332,6 @@ public final class TimerEngine: ObservableObject {
         currentBreakKind = .desk
         activeBreakKind = .desk
         secondsRemainingInPhase = remaining
-        overlayManager.dismiss()
         overlayManager.present(restSeconds: remaining, breakKind: .desk)
         notifyLifecycleStateChanged()
     }
@@ -636,11 +635,12 @@ public final class TimerEngine: ObservableObject {
 
     private func notifyFocusEndingSoonIfNeeded(remaining: Int) {
         guard !didNotifyFocusEndingSoon else { return }
+        // A warning is only useful for focus phases longer than the warning threshold.
         guard currentFocusTargetSeconds > focusEndingSoonThresholdSeconds else { return }
         guard remaining > 0, remaining <= focusEndingSoonThresholdSeconds else { return }
 
         didNotifyFocusEndingSoon = true
-        breakNotifier?.notifyFocusEndingSoon(remainingSeconds: focusEndingSoonThresholdSeconds)
+        breakNotifier?.notifyFocusEndingSoon(remainingSeconds: remaining)
     }
 
     private func focusRemainingSeconds(at now: Date) -> Int {

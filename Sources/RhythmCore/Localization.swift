@@ -481,7 +481,7 @@ public struct AppStrings {
     }
 
     public var focusEndingSoonNotificationTitle: String {
-        localized(chinese: "还有 5 分钟进入休息", english: "Break in 5 minutes")
+        localized(chinese: "还有 5 分钟进入休息", english: "Break starts in 5 minutes")
     }
 
     public func focusEndingSoonNotificationBody(remainingSeconds: Int) -> String {

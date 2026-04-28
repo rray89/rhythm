@@ -118,6 +118,7 @@ Near-term expectations:
 - the status item should show the current countdown in both focus and break states without obvious width jitter
 - the status item should not quietly disappear because of UI or system edge cases
 - if something does go wrong, the app should prefer restoring the menu bar entry instead of forcing the user to restart
+- launching a second Rhythm copy, including a packaged build while an Xcode/debug build is already running or vice versa, should activate the existing instance and terminate the duplicate
 
 ## 5. Near-Term Directions
 
@@ -242,13 +243,14 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 7. A blocking regular break can switch to `Desk break` without resetting the remaining timer
 8. The menu bar entry remains visible or recoverable in common failure scenarios
 9. The menu bar entry keeps the icon and shows a live countdown in both focus and break states without obvious jitter
-10. `Desk break` can continue without a blocking overlay
-11. Daily totals stay compact in the menu while deeper history and export live in the dedicated Insights window
-12. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
-13. System sleep contributes hidden rest and starts a fresh focus cycle after wake or unlock, depending on whether wake lands locked
-14. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
-15. Hidden rest counts in totals, trends, and export, but stays out of the default session list unless explicitly revealed
-16. Export supports explicit Today, Last 7 Days, Last 30 Days, All Time, and selected reporting-day scopes in both CSV and JSON
+10. A duplicate launch should not leave two Rhythm timers running at the same time
+11. `Desk break` can continue without a blocking overlay
+12. Daily totals stay compact in the menu while deeper history and export live in the dedicated Insights window
+13. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
+14. System sleep contributes hidden rest and starts a fresh focus cycle after wake or unlock, depending on whether wake lands locked
+15. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
+16. Hidden rest counts in totals, trends, and export, but stays out of the default session list unless explicitly revealed
+17. Export supports explicit Today, Last 7 Days, Last 30 Days, All Time, and selected reporting-day scopes in both CSV and JSON
 
 ## 8. Open Questions
 
