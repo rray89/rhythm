@@ -161,6 +161,10 @@ struct RhythmTDDRunner {
             guard english.breakDurationValue(60) == "1 min" else { return false }
             guard english.breakDurationValue(90) == "1m 30s" else { return false }
             guard english.breakDurationValue(7_200) == "2 hr" else { return false }
+            guard chinese.nextScheduledBreakValue(seconds: 300, usesDeskBreak: false) == "5 分钟 离屏" else { return false }
+            guard chinese.nextScheduledBreakValue(seconds: 300, usesDeskBreak: true) == "5 分钟 桌前" else { return false }
+            guard english.nextScheduledBreakValue(seconds: 300, usesDeskBreak: false) == "5 min Screen" else { return false }
+            guard english.nextScheduledBreakValue(seconds: 300, usesDeskBreak: true) == "5 min Desk" else { return false }
             guard english.countdownLabel(seconds: 7_200) == "2:00:00" else { return false }
             guard chinese.countdownLabel(seconds: 7_200) == "2:00:00" else { return false }
             guard chinese.breakPresetTitle(.desk) == "桌前休息" else { return false }
@@ -879,6 +883,80 @@ struct RhythmTDDRunner {
             guard sessions.captured[0].breakKind == .standard else { return false }
             guard sessions.captured[0].scheduledRestSeconds == 90 else { return false }
             return sessions.captured[0].actualRestSeconds == 0
+        }
+
+        failures += run("next scheduled break can be desk break for one cycle") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_535))
+            let settings = FakeSettings(focusSeconds: 8, restSeconds: 600)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            guard engine.usesDeskBreakForNextScheduledBreak == false else { return false }
+            engine.setNextScheduledBreakUsesDeskBreak(true)
+            guard engine.usesDeskBreakForNextScheduledBreak else { return false }
+
+            clock.now = clock.now.addingTimeInterval(8)
+            engine.processTick(now: clock.now)
+            guard engine.mode == .resting else { return false }
+            guard engine.activeBreakKind == .desk else { return false }
+            guard engine.usesDeskBreakForNextScheduledBreak == false else { return false }
+            guard overlay.lastPresentedBreakKind == .desk else { return false }
+            guard overlay.visiblePresentCount == 0 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(600)
+            engine.processTick(now: clock.now)
+            guard engine.mode == .focusing else { return false }
+
+            clock.now = clock.now.addingTimeInterval(8)
+            engine.processTick(now: clock.now)
+            guard engine.mode == .resting else { return false }
+            guard engine.activeBreakKind == .standard else { return false }
+            guard overlay.lastPresentedBreakKind == .standard else { return false }
+            return overlay.visiblePresentCount == 1
+        }
+
+        failures += run("no-rest mode overrides next scheduled desk break") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_545))
+            let settings = FakeSettings(focusSeconds: 8, restSeconds: 600, skipRestEnabled: true)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            engine.setNextScheduledBreakUsesDeskBreak(true)
+
+            clock.now = clock.now.addingTimeInterval(8)
+            engine.processTick(now: clock.now)
+
+            guard engine.mode == .focusing else { return false }
+            guard engine.usesDeskBreakForNextScheduledBreak == false else { return false }
+            guard overlay.lastPresentedBreakKind == nil else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].skipped else { return false }
+            guard sessions.captured[0].skipReason == "no_rest" else { return false }
+            return sessions.captured[0].breakKind == .standard
         }
 
         failures += run("manual break bypasses no-rest mode") {

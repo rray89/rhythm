@@ -39,6 +39,7 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - `Desk Break -5 Minutes` while a non-blocking `Desk break` is active
 4. Default settings and current-phase adjustments are treated as different concepts:
    - changing focus interval or break duration affects the next cycle
+   - while focusing, the next scheduled break can be toggled once to `Desk break`; the choice is consumed when that scheduled break starts
    - extending or shortening a phase affects only the current phase
 5. Menu bar visibility and related UI resilience have been hardened further:
    - the menu bar icon has been polished for better visibility
@@ -52,6 +53,7 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - the regular break default can be set up to 60 minutes
    - `Desk break` is the single explicit on-screen non-work break action in the menu
    - `Desk break` is intentionally non-blocking, continues in the menu without forcing a full-screen overlay, and can send a final-5-minute warning
+   - the upcoming scheduled break can be toggled to `Desk break` for one cycle, while no-rest mode still overrides and skips scheduled breaks
    - screen lock now counts as hidden away-from-screen rest until unlock, then starts a fresh focus cycle
    - system sleep without prior lock now also counts as hidden away-from-screen rest, ending at wake or continuing until unlock if wake lands on a locked screen
    - app-off time after normal quit or shutdown is counted as hidden rest on next launch, with a 15-minute heartbeat fallback for unclean exits and a 12-hour cap per gap
@@ -82,6 +84,7 @@ The fork keeps the phase-control model already explored in the branch work:
   - start break 5 minutes early
   - extend focus by 5 minutes
   - extend focus by 10 minutes
+  - toggle the upcoming scheduled break to `Desk break` for one cycle
   - notify once when the current focus phase reaches the final 5 minutes, using the default system notification sound when allowed
 - During break:
   - extend break by 1 minute
@@ -144,6 +147,7 @@ The current shipped rest model is intentionally simpler than the earlier long-br
 
 - regular short breaks remain configurable and can now go up to 60 minutes
 - `Desk break` is the deliberate on-screen, non-work break for watching a video, reading posts, or similar casual use
+- while focusing, the upcoming scheduled break can be toggled to `Desk break` for one cycle; the default remains a full-screen regular break, the choice resets when that scheduled break starts, and no-rest mode still skips scheduled breaks
 - a regular full-screen break can be converted into `Desk break` without restarting the break timer
 - when a `Desk break` longer than 5 minutes enters the final 5 minutes, Rhythm should notify once; when `Desk break` ends, Rhythm returns to focus automatically and should notify the user when notification permissions allow
 - away-from-desk time is represented by locking the Mac, which is counted as hidden rest until unlock
@@ -255,6 +259,7 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 16. App-off time contributes hidden rest through clean exit timestamps or heartbeat fallback, capped at 12 hours per gap
 17. Hidden rest counts in totals, trends, and export, but stays out of the default session list unless explicitly revealed
 18. Export supports explicit Today, Last 7 Days, Last 30 Days, All Time, and selected reporting-day scopes in both CSV and JSON
+19. A focusing user can toggle only the upcoming scheduled break into `Desk break`; the choice resets when that break starts, and no-rest mode still records a skipped standard scheduled break instead of showing it
 
 ## 8. Open Questions
 

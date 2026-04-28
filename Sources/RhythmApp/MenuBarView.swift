@@ -157,14 +157,7 @@ struct MenuBarView: View {
                 onIncrease: increaseFocusDuration
             )
 
-            compactSettingRow(
-                title: strings.breakDurationTitle,
-                value: strings.breakDurationValue(settingsStore.restSeconds),
-                canDecrease: settingsStore.restSeconds > (SettingsStore.restPresetSeconds.first ?? SettingsStore.minRestSeconds),
-                canIncrease: settingsStore.restSeconds < (SettingsStore.restPresetSeconds.last ?? SettingsStore.maxRestSeconds),
-                onDecrease: decreaseRestDuration,
-                onIncrease: increaseRestDuration
-            )
+            breakDurationSettingRow
 
             compactSettingRow(
                 title: strings.dayCutoffTitle,
@@ -328,16 +321,54 @@ struct MenuBarView: View {
             HStack(spacing: 8) {
                 compactAdjustButton(systemImage: "minus", enabled: canDecrease, action: onDecrease)
 
-                Text(value)
-                    .frame(width: 96, alignment: .center)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                compactSettingValue(value)
 
                 compactAdjustButton(systemImage: "plus", enabled: canIncrease, action: onIncrease)
             }
             .frame(width: 154, alignment: .trailing)
         }
         .font(.subheadline)
+    }
+
+    private var breakDurationSettingRow: some View {
+        HStack(spacing: 10) {
+            Text(strings.breakDurationTitle)
+                .frame(width: settingTitleWidth, alignment: .leading)
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 8) {
+                compactAdjustButton(
+                    systemImage: "minus",
+                    enabled: settingsStore.restSeconds > (SettingsStore.restPresetSeconds.first ?? SettingsStore.minRestSeconds),
+                    action: decreaseRestDuration
+                )
+
+                Button(action: toggleNextScheduledBreakKind) {
+                    compactSettingValue(breakDurationRowValue)
+                }
+                .buttonStyle(.borderless)
+                .disabled(timerEngine.mode != .focusing)
+
+                compactAdjustButton(
+                    systemImage: "plus",
+                    enabled: settingsStore.restSeconds < (SettingsStore.restPresetSeconds.last ?? SettingsStore.maxRestSeconds),
+                    action: increaseRestDuration
+                )
+            }
+            .frame(width: 154, alignment: .trailing)
+        }
+        .font(.subheadline)
+    }
+
+    @ViewBuilder
+    private func compactSettingValue(_ value: String) -> some View {
+        Text(value)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .frame(width: 96, alignment: .center)
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
     }
 
     @ViewBuilder
@@ -432,6 +463,21 @@ struct MenuBarView: View {
             return
         }
         settingsStore.restSeconds = previous
+    }
+
+    private var breakDurationRowValue: String {
+        if timerEngine.mode == .focusing {
+            return strings.nextScheduledBreakValue(
+                seconds: settingsStore.restSeconds,
+                usesDeskBreak: timerEngine.usesDeskBreakForNextScheduledBreak
+            )
+        }
+
+        return strings.breakDurationValue(settingsStore.restSeconds)
+    }
+
+    private func toggleNextScheduledBreakKind() {
+        timerEngine.setNextScheduledBreakUsesDeskBreak(!timerEngine.usesDeskBreakForNextScheduledBreak)
     }
 
     private func increaseDayBoundaryHour() {

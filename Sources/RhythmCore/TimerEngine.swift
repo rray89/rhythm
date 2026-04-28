@@ -45,6 +45,7 @@ public final class TimerEngine: ObservableObject {
     @Published public private(set) var secondsUntilBreak: Int
     @Published public private(set) var secondsRemainingInPhase: Int
     @Published public private(set) var activeBreakKind: BreakKind?
+    @Published public private(set) var usesDeskBreakForNextScheduledBreak = false
 
     public var onLifecycleStateChanged: (() -> Void)?
 
@@ -267,9 +268,18 @@ public final class TimerEngine: ObservableObject {
         startFocusCycle(at: now)
     }
 
+    public func setNextScheduledBreakUsesDeskBreak(_ usesDeskBreak: Bool) {
+        guard mode == .focusing, screenLockStartedAt == nil, systemSleepStartedAt == nil else { return }
+        guard usesDeskBreakForNextScheduledBreak != usesDeskBreak else { return }
+
+        usesDeskBreakForNextScheduledBreak = usesDeskBreak
+        notifyLifecycleStateChanged()
+    }
+
     public func startBreakNow() {
         guard mode == .focusing, screenLockStartedAt == nil, systemSleepStartedAt == nil else { return }
         let now = nowProvider()
+        clearNextScheduledBreakOverride()
         recordCurrentFocusSession(endedAt: now, endReason: .manualBreak)
         beginResting(kind: .standard, durationSeconds: settingsStore.restSeconds, startedAt: now)
     }
@@ -277,6 +287,7 @@ public final class TimerEngine: ObservableObject {
     public func startBreak(preset: BreakPreset) {
         guard mode == .focusing, screenLockStartedAt == nil, systemSleepStartedAt == nil else { return }
         let now = nowProvider()
+        clearNextScheduledBreakOverride()
         recordCurrentFocusSession(endedAt: now, endReason: .manualBreak)
         beginResting(kind: preset.kind, durationSeconds: preset.durationSeconds, startedAt: now)
     }
@@ -398,6 +409,8 @@ public final class TimerEngine: ObservableObject {
 
     private func beginScheduledRest(at now: Date) {
         recordCurrentFocusSession(endedAt: now, endReason: .scheduledBreak)
+        let scheduledBreakKind: BreakKind = usesDeskBreakForNextScheduledBreak ? .desk : .standard
+        clearNextScheduledBreakOverride()
 
         if settingsStore.skipRestEnabled {
             let session = RestSession(
@@ -415,7 +428,7 @@ public final class TimerEngine: ObservableObject {
             return
         }
 
-        beginResting(kind: .standard, durationSeconds: settingsStore.restSeconds, startedAt: now)
+        beginResting(kind: scheduledBreakKind, durationSeconds: settingsStore.restSeconds, startedAt: now)
     }
 
     private func beginResting(kind: BreakKind, durationSeconds: Int, startedAt: Date) {
@@ -471,6 +484,7 @@ public final class TimerEngine: ObservableObject {
         }
 
         screenLockStartedAt = now
+        clearNextScheduledBreakOverride()
         restStartedAt = nil
         currentRestTargetSeconds = nil
         currentBreakKind = nil
@@ -516,6 +530,7 @@ public final class TimerEngine: ObservableObject {
             overlayManager.dismiss()
         }
 
+        clearNextScheduledBreakOverride()
         screenLockStartedAt = nil
         systemSleepStartedAt = nil
         restStartedAt = nil
@@ -630,6 +645,7 @@ public final class TimerEngine: ObservableObject {
         }
 
         systemSleepStartedAt = now
+        clearNextScheduledBreakOverride()
         restStartedAt = nil
         currentRestTargetSeconds = nil
         currentBreakKind = nil
@@ -670,6 +686,10 @@ public final class TimerEngine: ObservableObject {
         }
 
         onLifecycleStateChanged?()
+    }
+
+    private func clearNextScheduledBreakOverride() {
+        usesDeskBreakForNextScheduledBreak = false
     }
 
     private func notifyFocusEndingSoonIfNeeded(remaining: Int) {
