@@ -454,6 +454,15 @@ public struct AppStrings {
         }
     }
 
+    public func shortenBreakButton(minutes: Int) -> String {
+        switch language {
+        case .chinese:
+            return "缩短 \(minutes) 分钟"
+        case .english:
+            return "Break -\(minutes)m"
+        }
+    }
+
     public func breakCompletedNotificationTitle(for kind: BreakKind) -> String {
         switch kind {
         case .desk:
@@ -489,6 +498,30 @@ public struct AppStrings {
             chinese: "当前专注还剩 \(compactDurationLabel(remainingSeconds))。",
             english: "Your current focus has \(compactDurationLabel(remainingSeconds)) remaining."
         )
+    }
+
+    public func breakEndingSoonNotificationTitle(for kind: BreakKind) -> String {
+        switch kind {
+        case .desk:
+            return localized(chinese: "桌前休息还剩 5 分钟", english: "Desk break ends in 5 minutes")
+        case .standard, .meal, .gym, .nap, .errand:
+            return localized(chinese: "休息还剩 5 分钟", english: "Break ends in 5 minutes")
+        }
+    }
+
+    public func breakEndingSoonNotificationBody(for kind: BreakKind, remainingSeconds: Int) -> String {
+        switch kind {
+        case .desk:
+            return localized(
+                chinese: "当前桌前休息还剩 \(compactDurationLabel(remainingSeconds))。",
+                english: "Your current Desk break has \(compactDurationLabel(remainingSeconds)) remaining."
+            )
+        case .standard, .meal, .gym, .nap, .errand:
+            return localized(
+                chinese: "当前休息还剩 \(compactDurationLabel(remainingSeconds))。",
+                english: "Your current break has \(compactDurationLabel(remainingSeconds)) remaining."
+            )
+        }
     }
 
     public func weekdayTrendLabel(_ weekday: Int) -> String {

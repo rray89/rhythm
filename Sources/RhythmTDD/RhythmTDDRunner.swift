@@ -56,6 +56,9 @@ struct RhythmTDDRunner {
             store.restSeconds = 1_111
             guard store.restSeconds == 1_200 else { return false }
 
+            store.restSeconds = 3_500
+            guard store.restSeconds == 3_600 else { return false }
+
             store.dayBoundaryHour = -5
             guard store.dayBoundaryHour == 0 else { return false }
 
@@ -1014,6 +1017,61 @@ struct RhythmTDDRunner {
             return notifier.notifiedKinds.isEmpty
         }
 
+        failures += run("desk break can shorten by five minutes without firing warning from the shortcut") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_805))
+            let settings = FakeSettings(focusSeconds: 12, restSeconds: 90)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+            let notifier = FakeBreakNotifier()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                breakNotifier: notifier,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            engine.startBreak(preset: BreakPreset(kind: .desk, durationSeconds: 600))
+
+            clock.now = clock.now.addingTimeInterval(200)
+            engine.processTick(now: clock.now)
+            guard engine.secondsRemainingInPhase == 400 else { return false }
+            guard engine.canShortenRest(by: 300) else { return false }
+
+            engine.shortenRest(by: 300)
+            guard engine.mode == .resting else { return false }
+            guard engine.secondsRemainingInPhase == 100 else { return false }
+            guard overlay.updatedRemainingSeconds.last == 100 else { return false }
+            guard notifier.breakEndingSoonNotifications.isEmpty else { return false }
+            guard sessions.captured.isEmpty else { return false }
+
+            clock.now = clock.now.addingTimeInterval(1)
+            engine.processTick(now: clock.now)
+            guard notifier.breakEndingSoonNotifications.isEmpty else { return false }
+
+            engine.extendRest(by: 300)
+            guard engine.secondsRemainingInPhase == 399 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(99)
+            engine.processTick(now: clock.now)
+            guard notifier.breakEndingSoonNotifications.count == 1 else { return false }
+            guard notifier.breakEndingSoonNotifications[0].kind == .desk else { return false }
+            guard notifier.breakEndingSoonNotifications[0].remainingSeconds == 300 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(1)
+            engine.processTick(now: clock.now)
+            guard engine.canShortenRest(by: 300) == false else { return false }
+
+            engine.shortenRest(by: 300)
+            return engine.secondsRemainingInPhase == 299
+        }
+
         failures += run("focus ending soon notification reports actual remaining once per five minute crossing") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 1_810))
             let settings = FakeSettings(focusSeconds: 600, restSeconds: 90)
@@ -1053,6 +1111,53 @@ struct RhythmTDDRunner {
             engine.processTick(now: clock.now)
 
             return notifier.focusEndingSoonRemainingSeconds == [296, 300]
+        }
+
+        failures += run("desk break ending soon notification reports actual remaining once per five minute crossing") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_815))
+            let settings = FakeSettings(focusSeconds: 12, restSeconds: 90)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+            let notifier = FakeBreakNotifier()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                breakNotifier: notifier,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            engine.startBreak(preset: BreakPreset(kind: .desk, durationSeconds: 600))
+
+            clock.now = clock.now.addingTimeInterval(299)
+            engine.processTick(now: clock.now)
+            guard notifier.breakEndingSoonNotifications.isEmpty else { return false }
+
+            clock.now = clock.now.addingTimeInterval(5)
+            engine.processTick(now: clock.now)
+            guard notifier.breakEndingSoonNotifications.count == 1 else { return false }
+            guard notifier.breakEndingSoonNotifications[0].kind == .desk else { return false }
+            guard notifier.breakEndingSoonNotifications[0].remainingSeconds == 296 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(1)
+            engine.processTick(now: clock.now)
+            guard notifier.breakEndingSoonNotifications.count == 1 else { return false }
+
+            engine.extendRest(by: 300)
+            guard engine.secondsRemainingInPhase == 595 else { return false }
+
+            clock.now = clock.now.addingTimeInterval(295)
+            engine.processTick(now: clock.now)
+
+            guard notifier.breakEndingSoonNotifications.count == 2 else { return false }
+            guard notifier.breakEndingSoonNotifications[1].kind == .desk else { return false }
+            return notifier.breakEndingSoonNotifications[1].remainingSeconds == 300
         }
 
         failures += run("standard overlay rest can switch to desk break and keep remaining timer") {
@@ -2038,6 +2143,7 @@ private final class FakeOverlay: RestOverlaying {
 private final class FakeBreakNotifier: BreakCompletionNotifying {
     private(set) var notifiedKinds: [BreakKind] = []
     private(set) var focusEndingSoonRemainingSeconds: [Int] = []
+    private(set) var breakEndingSoonNotifications: [(kind: BreakKind, remainingSeconds: Int)] = []
 
     func notifyBreakCompleted(kind: BreakKind) {
         notifiedKinds.append(kind)
@@ -2045,6 +2151,10 @@ private final class FakeBreakNotifier: BreakCompletionNotifying {
 
     func notifyFocusEndingSoon(remainingSeconds: Int) {
         focusEndingSoonRemainingSeconds.append(remainingSeconds)
+    }
+
+    func notifyBreakEndingSoon(kind: BreakKind, remainingSeconds: Int) {
+        breakEndingSoonNotifications.append((kind, remainingSeconds))
     }
 }
 

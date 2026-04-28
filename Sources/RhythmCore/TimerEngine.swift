@@ -20,6 +20,7 @@ public protocol RestOverlaying: AnyObject {
 public protocol BreakCompletionNotifying: AnyObject {
     func notifyBreakCompleted(kind: BreakKind)
     func notifyFocusEndingSoon(remainingSeconds: Int)
+    func notifyBreakEndingSoon(kind: BreakKind, remainingSeconds: Int)
 }
 
 @MainActor
@@ -139,7 +140,8 @@ public final class TimerEngine: ObservableObject {
     private var timer: Timer?
     private var hasPreparedForAppExit = false
     private var didNotifyFocusEndingSoon = false
-    private let focusEndingSoonThresholdSeconds = 300
+    private var didNotifyBreakEndingSoon = false
+    private let endingSoonThresholdSeconds = 300
 
     public init(
         settingsStore: RhythmSettings,
@@ -292,7 +294,7 @@ public final class TimerEngine: ObservableObject {
         guard mode == .focusing, screenLockStartedAt == nil, systemSleepStartedAt == nil, seconds > 0 else { return }
         currentFocusTargetSeconds += seconds
         processTick(now: nowProvider())
-        if secondsUntilBreak > focusEndingSoonThresholdSeconds {
+        if secondsUntilBreak > endingSoonThresholdSeconds {
             didNotifyFocusEndingSoon = false
         }
         notifyLifecycleStateChanged()
@@ -319,6 +321,37 @@ public final class TimerEngine: ObservableObject {
         let remaining = restRemainingSeconds(at: nowProvider())
         secondsRemainingInPhase = remaining
         overlayManager.updateRemaining(restSeconds: remaining)
+        if remaining > endingSoonThresholdSeconds {
+            didNotifyBreakEndingSoon = false
+        }
+        notifyLifecycleStateChanged()
+    }
+
+    public func canShortenRest(by seconds: Int) -> Bool {
+        guard mode == .resting, screenLockStartedAt == nil, systemSleepStartedAt == nil, seconds > 0 else { return false }
+        guard currentBreakKind == .desk else { return false }
+        return restRemainingSeconds(at: nowProvider()) >= seconds
+    }
+
+    public func shortenRest(by seconds: Int) {
+        let now = nowProvider()
+        guard mode == .resting, screenLockStartedAt == nil, systemSleepStartedAt == nil, seconds > 0 else { return }
+        guard currentBreakKind == .desk else { return }
+        guard restRemainingSeconds(at: now) >= seconds else { return }
+
+        currentRestTargetSeconds = max(0, (currentRestTargetSeconds ?? settingsStore.restSeconds) - seconds)
+        let remaining = restRemainingSeconds(at: now)
+        secondsRemainingInPhase = remaining
+        overlayManager.updateRemaining(restSeconds: remaining)
+
+        if remaining == 0 {
+            finishRest(skipped: false, skipReason: nil, endedAt: now)
+            return
+        }
+
+        if remaining <= endingSoonThresholdSeconds {
+            didNotifyBreakEndingSoon = true
+        }
         notifyLifecycleStateChanged()
     }
 
@@ -355,6 +388,7 @@ public final class TimerEngine: ObservableObject {
             let remaining = restRemainingSeconds(at: now)
             secondsRemainingInPhase = remaining
             overlayManager.updateRemaining(restSeconds: remaining)
+            notifyBreakEndingSoonIfNeeded(remaining: remaining)
 
             if remaining == 0 {
                 finishRest(skipped: false, skipReason: nil, endedAt: now)
@@ -390,6 +424,7 @@ public final class TimerEngine: ObservableObject {
         currentRestTargetSeconds = durationSeconds
         currentBreakKind = kind
         activeBreakKind = kind
+        didNotifyBreakEndingSoon = false
         secondsRemainingInPhase = durationSeconds
         overlayManager.present(restSeconds: durationSeconds, breakKind: kind)
         notifyLifecycleStateChanged()
@@ -440,6 +475,7 @@ public final class TimerEngine: ObservableObject {
         currentRestTargetSeconds = nil
         currentBreakKind = nil
         activeBreakKind = nil
+        didNotifyBreakEndingSoon = false
         mode = .focusing
         currentFocusTargetSeconds = settingsStore.focusSeconds
         secondsUntilBreak = currentFocusTargetSeconds
@@ -486,6 +522,7 @@ public final class TimerEngine: ObservableObject {
         currentRestTargetSeconds = nil
         currentBreakKind = nil
         activeBreakKind = nil
+        didNotifyBreakEndingSoon = false
 
         cycleStartedAt = startedAt
         currentFocusTargetSeconds = settingsStore.focusSeconds
@@ -542,6 +579,7 @@ public final class TimerEngine: ObservableObject {
         currentRestTargetSeconds = nil
         currentBreakKind = nil
         activeBreakKind = nil
+        didNotifyBreakEndingSoon = false
 
         return (breakKind, shouldNotify)
     }
@@ -596,6 +634,7 @@ public final class TimerEngine: ObservableObject {
         currentRestTargetSeconds = nil
         currentBreakKind = nil
         activeBreakKind = nil
+        didNotifyBreakEndingSoon = false
         mode = .focusing
         currentFocusTargetSeconds = settingsStore.focusSeconds
         secondsUntilBreak = currentFocusTargetSeconds
@@ -636,11 +675,21 @@ public final class TimerEngine: ObservableObject {
     private func notifyFocusEndingSoonIfNeeded(remaining: Int) {
         guard !didNotifyFocusEndingSoon else { return }
         // A warning is only useful for focus phases longer than the warning threshold.
-        guard currentFocusTargetSeconds > focusEndingSoonThresholdSeconds else { return }
-        guard remaining > 0, remaining <= focusEndingSoonThresholdSeconds else { return }
+        guard currentFocusTargetSeconds > endingSoonThresholdSeconds else { return }
+        guard remaining > 0, remaining <= endingSoonThresholdSeconds else { return }
 
         didNotifyFocusEndingSoon = true
         breakNotifier?.notifyFocusEndingSoon(remainingSeconds: remaining)
+    }
+
+    private func notifyBreakEndingSoonIfNeeded(remaining: Int) {
+        guard !didNotifyBreakEndingSoon else { return }
+        guard currentBreakKind == .desk else { return }
+        guard let currentRestTargetSeconds, currentRestTargetSeconds > endingSoonThresholdSeconds else { return }
+        guard remaining > 0, remaining <= endingSoonThresholdSeconds else { return }
+
+        didNotifyBreakEndingSoon = true
+        breakNotifier?.notifyBreakEndingSoon(kind: .desk, remainingSeconds: remaining)
     }
 
     private func focusRemainingSeconds(at now: Date) -> Int {
