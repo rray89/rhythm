@@ -35,7 +35,11 @@ public struct SingleInstancePolicy: Sendable {
     }
 
     public func existingInstance(in runningApplications: [RunningApplicationSnapshot]) -> RunningApplicationSnapshot? {
-        runningApplications.first { application in
+        duplicateInstances(in: runningApplications).first
+    }
+
+    public func duplicateInstances(in runningApplications: [RunningApplicationSnapshot]) -> [RunningApplicationSnapshot] {
+        runningApplications.filter { application in
             guard application.processIdentifier != processIdentifier else {
                 return false
             }

@@ -118,7 +118,7 @@ Near-term expectations:
 - the status item should show the current countdown in both focus and break states without obvious width jitter
 - the status item should not quietly disappear because of UI or system edge cases
 - if something does go wrong, the app should prefer restoring the menu bar entry instead of forcing the user to restart
-- launching a second Rhythm copy, including a packaged build while an Xcode/debug build is already running or vice versa, should activate the existing instance and terminate the duplicate
+- launching a second Rhythm copy, including a packaged build while an Xcode/debug build is already running or vice versa, should activate the existing instance and terminate the duplicate; the primary instance should also clean up later duplicate launches while it remains running
 
 ## 5. Near-Term Directions
 
@@ -243,7 +243,7 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 7. A blocking regular break can switch to `Desk break` without resetting the remaining timer
 8. The menu bar entry remains visible or recoverable in common failure scenarios
 9. The menu bar entry keeps the icon and shows a live countdown in both focus and break states without obvious jitter
-10. A duplicate launch should not leave two Rhythm timers running at the same time
+10. A duplicate launch, including a later launch after the primary app is already running, should not leave two Rhythm timers running at the same time
 11. `Desk break` can continue without a blocking overlay
 12. Daily totals stay compact in the menu while deeper history and export live in the dedicated Insights window
 13. Screen lock contributes to rest totals and begins a fresh focus cycle when the machine unlocks
