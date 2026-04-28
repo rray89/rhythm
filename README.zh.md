@@ -73,6 +73,8 @@ SKIP_DMG=1 ./scripts/package_dmg.sh
 
 这个脚本只是本地 / 直接分发辅助工具。它使用 ad-hoc 签名，不是 App Store，也不是 notarized release 流程。
 
+系统通知相关测试应使用 `dist/Rhythm.app`。直接从 Xcode 或 `swift run` 启动的原始可执行文件不是标准 app bundle，因此会主动跳过系统通知。
+
 ## TDD 回归检查
 
 ```bash

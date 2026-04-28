@@ -5,13 +5,21 @@ import UserNotifications
 final class BreakNotificationManager: BreakCompletionNotifying {
     private let settingsStore: SettingsStore
     private let notificationCenterProvider: (() -> UNUserNotificationCenter)?
+    private let canUseUserNotifications: () -> Bool
 
     init(
         settingsStore: SettingsStore,
-        notificationCenterProvider: (() -> UNUserNotificationCenter)? = nil
+        notificationCenterProvider: (() -> UNUserNotificationCenter)? = nil,
+        canUseUserNotifications: (() -> Bool)? = nil
     ) {
         self.settingsStore = settingsStore
         self.notificationCenterProvider = notificationCenterProvider
+        self.canUseUserNotifications = canUseUserNotifications ?? {
+            NotificationRuntimePolicy.canUseUserNotifications(
+                bundleIdentifier: Bundle.main.bundleIdentifier,
+                bundleURL: Bundle.main.bundleURL
+            )
+        }
     }
 
     func notifyBreakCompleted(kind: BreakKind) {
@@ -35,6 +43,10 @@ final class BreakNotificationManager: BreakCompletionNotifying {
         title: @escaping (AppStrings) -> String,
         body: @escaping (AppStrings) -> String
     ) {
+        guard canUseUserNotifications() else {
+            return
+        }
+
         Task {
             let notificationCenter = resolvedNotificationCenter()
             guard await ensureAuthorization() else { return }

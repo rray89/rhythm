@@ -185,6 +185,26 @@ struct RhythmTDDRunner {
             return chinese.menuBarAccessibilityLabel(mode: .resting, remainingSeconds: 7_200, breakKind: .desk) == "Rhythm，桌前休息，剩余 2:00:00"
         }
 
+        failures += run("user notifications require a bundled app runtime") {
+            let appBundleURL = URL(fileURLWithPath: "/Applications/Rhythm.app")
+            let debugExecutableURL = URL(fileURLWithPath: "/Users/rray/Library/Developer/Xcode/DerivedData/rhythm/Build/Products/Debug/Rhythm")
+
+            guard NotificationRuntimePolicy.canUseUserNotifications(
+                bundleIdentifier: "com.xiao2dou.rhythm",
+                bundleURL: appBundleURL
+            ) else { return false }
+
+            guard !NotificationRuntimePolicy.canUseUserNotifications(
+                bundleIdentifier: nil,
+                bundleURL: debugExecutableURL
+            ) else { return false }
+
+            return !NotificationRuntimePolicy.canUseUserNotifications(
+                bundleIdentifier: "Rhythm",
+                bundleURL: debugExecutableURL
+            )
+        }
+
         failures += run("legacy rest sessions decode without a break kind or source") {
             let json = """
             [

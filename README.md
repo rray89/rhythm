@@ -73,6 +73,8 @@ This refreshes `dist/Rhythm.app` so you can launch it directly. To also create a
 
 This script is a local/direct-distribution helper. It uses an ad-hoc signature and is not the App Store or notarized release flow.
 
+System notification checks should use `dist/Rhythm.app`. Raw Xcode / `swift run` executables intentionally skip system notifications because they are not normal app bundles.
+
 ## TDD Regression Checks
 
 ```bash
