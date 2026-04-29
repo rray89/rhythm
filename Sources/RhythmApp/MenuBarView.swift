@@ -345,7 +345,7 @@ struct MenuBarView: View {
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 7) {
+            HStack(spacing: 8) {
                 Toggle("", isOn: Binding(
                     get: { timerEngine.usesDeskBreakForNextScheduledBreak },
                     set: { timerEngine.setNextScheduledBreakUsesDeskBreak($0) }
@@ -357,21 +357,23 @@ struct MenuBarView: View {
                 .help(strings.nextScheduledDeskBreakToggleTitle)
                 .accessibilityLabel(strings.nextScheduledDeskBreakToggleTitle)
 
-                compactAdjustButton(
-                    systemImage: "minus",
-                    enabled: settingsStore.restSeconds > (SettingsStore.restPresetSeconds.first ?? SettingsStore.minRestSeconds),
-                    action: decreaseRestDuration
-                )
+                HStack(spacing: 8) {
+                    compactAdjustButton(
+                        systemImage: "minus",
+                        enabled: settingsStore.restSeconds > (SettingsStore.restPresetSeconds.first ?? SettingsStore.minRestSeconds),
+                        action: decreaseRestDuration
+                    )
 
-                compactSettingValue(strings.breakDurationValue(settingsStore.restSeconds), width: 76)
+                    compactSettingValue(strings.breakDurationValue(settingsStore.restSeconds))
 
-                compactAdjustButton(
-                    systemImage: "plus",
-                    enabled: settingsStore.restSeconds < (SettingsStore.restPresetSeconds.last ?? SettingsStore.maxRestSeconds),
-                    action: increaseRestDuration
-                )
+                    compactAdjustButton(
+                        systemImage: "plus",
+                        enabled: settingsStore.restSeconds < (SettingsStore.restPresetSeconds.last ?? SettingsStore.maxRestSeconds),
+                        action: increaseRestDuration
+                    )
+                }
+                .frame(width: 154, alignment: .trailing)
             }
-            .frame(width: 184, alignment: .trailing)
         }
         .font(.subheadline)
     }
