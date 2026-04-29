@@ -38,7 +38,7 @@ This README describes the behavior currently shipped in this fork. If you want t
 - Hidden app-off rest: normal quit or shutdown records the close time, then the next launch counts that gap as hidden rest; a 15-minute heartbeat provides fallback recovery for unclean exits, capped at 12 hours per gap
 - Desk break: the menu provides a dedicated `Desk break` action for "still on the computer, but not working" scenarios
 - Layered break presentation:
-  - while focusing, the Break setting row includes a switch that toggles only the upcoming scheduled break between the default full-screen break and `Desk break`; the choice resets once that scheduled break starts, and no-rest mode still skips it
+  - while focusing, the Break setting row includes a switch that toggles only the upcoming scheduled break between the default full-screen break and `Desk break`; pressing `Break Now` uses the selected break kind immediately, the choice resets once that break starts, and no-rest mode still skips scheduled breaks
   - regular breaks use a full-screen translucent overlay, can be ended early with `ESC`, or can be switched into a non-blocking `Desk break` while keeping the same remaining timer
   - `Desk break` stays non-blocking, keeps the Mac usable, can be shortened by 5 minutes from the menu, continues counting down in the menu, sends a final-5-minute warning for breaks longer than 5 minutes, and automatically returns to focus with a completion notification when possible
 - Local history: focus and rest sessions, planned durations, actual durations, and end reasons are stored in weekly JSON history under `Application Support/Rhythm/history/weeks/`; the Insights window keeps fixed-range charts, uses monthly aggregation for `All Time`, browses sessions one reporting day at a time, and exports `Today`, `Last 7 Days`, `Last 30 Days`, `All Time`, or the selected reporting day as CSV or JSON; app-off recovery state lives in `Application Support/Rhythm/state/app-lifecycle.json`
@@ -90,7 +90,7 @@ This command runs repeatable regression coverage for:
 - insights snapshots, hidden-rest history state, and fixed-range / selected-day CSV/JSON export
 - focus-ending-soon notifications
 - skipped breaks and `Desk break` session recording
-- one-cycle next scheduled `Desk break` toggle and no-rest override
+- one-cycle next scheduled `Desk break` toggle, `Break Now` handoff, and no-rest override
 - hidden screen-lock rest and fresh focus after unlock
 - hidden sleep rest for sleep/wake and wake-to-lock flows
 - hidden app-off rest, heartbeat fallback recovery, and the 12-hour cap

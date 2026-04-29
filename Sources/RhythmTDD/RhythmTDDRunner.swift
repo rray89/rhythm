@@ -961,6 +961,107 @@ struct RhythmTDDRunner {
             return sessions.captured[0].breakKind == .standard
         }
 
+        failures += run("break now honors next scheduled desk break toggle") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_555))
+            let settings = FakeSettings(focusSeconds: 12, restSeconds: 600)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(4)
+            engine.processTick(now: clock.now)
+            engine.setNextScheduledBreakUsesDeskBreak(true)
+            engine.startBreakNow()
+
+            guard engine.mode == .resting else { return false }
+            guard engine.activeBreakKind == .desk else { return false }
+            guard engine.usesDeskBreakForNextScheduledBreak == false else { return false }
+            guard overlay.lastPresentedBreakKind == .desk else { return false }
+            guard overlay.visiblePresentCount == 0 else { return false }
+            guard sessions.capturedFocus.count == 1 else { return false }
+            return sessions.capturedFocus[0].endReason == .manualBreak
+        }
+
+        failures += run("next scheduled desk break toggle is disabled and cleared outside active focus") {
+            let settings = FakeSettings(focusSeconds: 12, restSeconds: 600)
+
+            do {
+                let clock = TestClock(now: Date(timeIntervalSince1970: 1_565))
+                let engine = TimerEngine(
+                    settingsStore: settings,
+                    sessionStore: FakeSessionStore(),
+                    overlayManager: FakeOverlay(),
+                    lockMonitor: FakeLockMonitor(),
+                    nowProvider: { clock.now },
+                    autoStart: false,
+                    useSystemTimer: false
+                )
+
+                engine.start()
+                guard engine.canSetNextScheduledBreakUsesDeskBreak else { return false }
+                engine.setNextScheduledBreakUsesDeskBreak(true)
+                engine.resetCycle()
+                guard engine.usesDeskBreakForNextScheduledBreak == false else { return false }
+                guard engine.canSetNextScheduledBreakUsesDeskBreak else { return false }
+            }
+
+            do {
+                let clock = TestClock(now: Date(timeIntervalSince1970: 1_575))
+                let lock = FakeLockMonitor()
+                let engine = TimerEngine(
+                    settingsStore: settings,
+                    sessionStore: FakeSessionStore(),
+                    overlayManager: FakeOverlay(),
+                    lockMonitor: lock,
+                    nowProvider: { clock.now },
+                    autoStart: false,
+                    useSystemTimer: false
+                )
+
+                engine.start()
+                engine.setNextScheduledBreakUsesDeskBreak(true)
+                lock.fireLock()
+                guard engine.usesDeskBreakForNextScheduledBreak == false else { return false }
+                guard engine.canSetNextScheduledBreakUsesDeskBreak == false else { return false }
+                engine.setNextScheduledBreakUsesDeskBreak(true)
+                guard engine.usesDeskBreakForNextScheduledBreak == false else { return false }
+            }
+
+            do {
+                let clock = TestClock(now: Date(timeIntervalSince1970: 1_585))
+                let sleep = FakeSleepMonitor()
+                let engine = TimerEngine(
+                    settingsStore: settings,
+                    sessionStore: FakeSessionStore(),
+                    overlayManager: FakeOverlay(),
+                    lockMonitor: FakeLockMonitor(),
+                    systemSleepMonitor: sleep,
+                    nowProvider: { clock.now },
+                    autoStart: false,
+                    useSystemTimer: false
+                )
+
+                engine.start()
+                engine.setNextScheduledBreakUsesDeskBreak(true)
+                sleep.fireWillSleep()
+                guard engine.usesDeskBreakForNextScheduledBreak == false else { return false }
+                guard engine.canSetNextScheduledBreakUsesDeskBreak == false else { return false }
+                engine.setNextScheduledBreakUsesDeskBreak(true)
+                return engine.usesDeskBreakForNextScheduledBreak == false
+            }
+        }
+
         failures += run("manual break bypasses no-rest mode") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 1_650))
             let settings = FakeSettings(focusSeconds: 12, restSeconds: 90, skipRestEnabled: true)

@@ -353,7 +353,7 @@ struct MenuBarView: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.mini)
-                .disabled(timerEngine.mode != .focusing)
+                .disabled(!timerEngine.canSetNextScheduledBreakUsesDeskBreak)
                 .help(strings.nextScheduledDeskBreakToggleTitle)
                 .accessibilityLabel(strings.nextScheduledDeskBreakToggleTitle)
 

@@ -49,6 +49,10 @@ public final class TimerEngine: ObservableObject {
 
     public var onLifecycleStateChanged: (() -> Void)?
 
+    public var canSetNextScheduledBreakUsesDeskBreak: Bool {
+        mode == .focusing && screenLockStartedAt == nil && systemSleepStartedAt == nil
+    }
+
     public var statusItemCountdownSeconds: Int {
         switch mode {
         case .focusing:
@@ -269,7 +273,7 @@ public final class TimerEngine: ObservableObject {
     }
 
     public func setNextScheduledBreakUsesDeskBreak(_ usesDeskBreak: Bool) {
-        guard mode == .focusing, screenLockStartedAt == nil, systemSleepStartedAt == nil else { return }
+        guard canSetNextScheduledBreakUsesDeskBreak else { return }
         guard usesDeskBreakForNextScheduledBreak != usesDeskBreak else { return }
 
         usesDeskBreakForNextScheduledBreak = usesDeskBreak
@@ -279,9 +283,10 @@ public final class TimerEngine: ObservableObject {
     public func startBreakNow() {
         guard mode == .focusing, screenLockStartedAt == nil, systemSleepStartedAt == nil else { return }
         let now = nowProvider()
+        let breakKind: BreakKind = usesDeskBreakForNextScheduledBreak ? .desk : .standard
         clearNextScheduledBreakOverride()
         recordCurrentFocusSession(endedAt: now, endReason: .manualBreak)
-        beginResting(kind: .standard, durationSeconds: settingsStore.restSeconds, startedAt: now)
+        beginResting(kind: breakKind, durationSeconds: settingsStore.restSeconds, startedAt: now)
     }
 
     public func startBreak(preset: BreakPreset) {
