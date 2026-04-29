@@ -17,6 +17,10 @@ struct MenuBarView: View {
         settingsStore.effectiveAppLanguage == .english ? 82 : 68
     }
 
+    private var breakSettingTitleWidth: CGFloat {
+        settingsStore.effectiveAppLanguage == .english ? 122 : 68
+    }
+
     private var currentBreakKind: BreakKind {
         timerEngine.activeBreakKind ?? .standard
     }
@@ -157,14 +161,7 @@ struct MenuBarView: View {
                 onIncrease: increaseFocusDuration
             )
 
-            compactSettingRow(
-                title: strings.breakDurationTitle,
-                value: strings.breakDurationValue(settingsStore.restSeconds),
-                canDecrease: settingsStore.restSeconds > (SettingsStore.restPresetSeconds.first ?? SettingsStore.minRestSeconds),
-                canIncrease: settingsStore.restSeconds < (SettingsStore.restPresetSeconds.last ?? SettingsStore.maxRestSeconds),
-                onDecrease: decreaseRestDuration,
-                onIncrease: increaseRestDuration
-            )
+            breakDurationSettingRow
 
             compactSettingRow(
                 title: strings.dayCutoffTitle,
@@ -328,16 +325,67 @@ struct MenuBarView: View {
             HStack(spacing: 8) {
                 compactAdjustButton(systemImage: "minus", enabled: canDecrease, action: onDecrease)
 
-                Text(value)
-                    .frame(width: 96, alignment: .center)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                compactSettingValue(value)
 
                 compactAdjustButton(systemImage: "plus", enabled: canIncrease, action: onIncrease)
             }
             .frame(width: 154, alignment: .trailing)
         }
         .font(.subheadline)
+    }
+
+    private var breakDurationSettingRow: some View {
+        HStack(spacing: 10) {
+            Text(strings.nextScheduledBreakRowTitle(
+                usesDeskBreak: timerEngine.usesDeskBreakForNextScheduledBreak
+            ))
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .frame(width: breakSettingTitleWidth, alignment: .leading)
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 8) {
+                Toggle("", isOn: Binding(
+                    get: { timerEngine.usesDeskBreakForNextScheduledBreak },
+                    set: { timerEngine.setNextScheduledBreakUsesDeskBreak($0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .disabled(!timerEngine.canSetNextScheduledBreakUsesDeskBreak)
+                .help(strings.nextScheduledDeskBreakToggleTitle)
+                .accessibilityLabel(strings.nextScheduledDeskBreakToggleTitle)
+
+                HStack(spacing: 8) {
+                    compactAdjustButton(
+                        systemImage: "minus",
+                        enabled: settingsStore.restSeconds > (SettingsStore.restPresetSeconds.first ?? SettingsStore.minRestSeconds),
+                        action: decreaseRestDuration
+                    )
+
+                    compactSettingValue(strings.breakDurationValue(settingsStore.restSeconds))
+
+                    compactAdjustButton(
+                        systemImage: "plus",
+                        enabled: settingsStore.restSeconds < (SettingsStore.restPresetSeconds.last ?? SettingsStore.maxRestSeconds),
+                        action: increaseRestDuration
+                    )
+                }
+                .frame(width: 154, alignment: .trailing)
+            }
+        }
+        .font(.subheadline)
+    }
+
+    @ViewBuilder
+    private func compactSettingValue(_ value: String, width: CGFloat = 96) -> some View {
+        Text(value)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .frame(width: width, alignment: .center)
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
     }
 
     @ViewBuilder

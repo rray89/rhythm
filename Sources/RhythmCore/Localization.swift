@@ -247,6 +247,19 @@ public struct AppStrings {
         compactDurationLabel(seconds)
     }
 
+    public var nextScheduledDeskBreakToggleTitle: String {
+        localized(chinese: "下次桌前休息", english: "Next Desk break")
+    }
+
+    public func nextScheduledBreakRowTitle(usesDeskBreak: Bool) -> String {
+        switch language {
+        case .chinese:
+            return usesDeskBreak ? "桌前休息" : "离屏休息"
+        case .english:
+            return usesDeskBreak ? "Desk break" : "Off-screen break"
+        }
+    }
+
     public var languageTitle: String {
         localized(chinese: "语言", english: "Language")
     }
