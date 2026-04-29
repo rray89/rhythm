@@ -163,6 +163,10 @@ struct RhythmTDDRunner {
             guard english.breakDurationValue(7_200) == "2 hr" else { return false }
             guard chinese.nextScheduledDeskBreakToggleTitle == "下次桌前休息" else { return false }
             guard english.nextScheduledDeskBreakToggleTitle == "Next Desk break" else { return false }
+            guard chinese.nextScheduledBreakRowTitle(usesDeskBreak: false) == "离屏休息" else { return false }
+            guard chinese.nextScheduledBreakRowTitle(usesDeskBreak: true) == "桌前休息" else { return false }
+            guard english.nextScheduledBreakRowTitle(usesDeskBreak: false) == "Off-screen break" else { return false }
+            guard english.nextScheduledBreakRowTitle(usesDeskBreak: true) == "Desk break" else { return false }
             guard english.countdownLabel(seconds: 7_200) == "2:00:00" else { return false }
             guard chinese.countdownLabel(seconds: 7_200) == "2:00:00" else { return false }
             guard chinese.breakPresetTitle(.desk) == "桌前休息" else { return false }

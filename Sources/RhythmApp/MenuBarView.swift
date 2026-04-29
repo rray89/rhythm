@@ -17,6 +17,10 @@ struct MenuBarView: View {
         settingsStore.effectiveAppLanguage == .english ? 82 : 68
     }
 
+    private var breakSettingTitleWidth: CGFloat {
+        settingsStore.effectiveAppLanguage == .english ? 122 : 68
+    }
+
     private var currentBreakKind: BreakKind {
         timerEngine.activeBreakKind ?? .standard
     }
@@ -332,8 +336,12 @@ struct MenuBarView: View {
 
     private var breakDurationSettingRow: some View {
         HStack(spacing: 10) {
-            Text(strings.breakDurationTitle)
-                .frame(width: settingTitleWidth, alignment: .leading)
+            Text(strings.nextScheduledBreakRowTitle(
+                usesDeskBreak: timerEngine.usesDeskBreakForNextScheduledBreak
+            ))
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .frame(width: breakSettingTitleWidth, alignment: .leading)
 
             Spacer(minLength: 0)
 
