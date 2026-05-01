@@ -32,7 +32,7 @@ This README describes the behavior currently shipped in this fork. If you want t
 - Insights window: open a dedicated window from the menu for `Today`, `Last 7 Days`, `Last 30 Days`, and `All Time` summaries, compact range totals, a day-based sessions browser, and scoped export; fixed-range charts follow the configured reporting-day cutoff, and `All Time` is aggregated by month
 - Day cutoff: reporting for "today" can be shifted anywhere from `00:00` to `23:00`
 - No-rest mode: automatically skips breaks when enabled and records the skipped break session
-- Ending-soon warnings: when an active focus phase or `Desk break` reaches the final 5 minutes, Rhythm sends a notification with the default system sound when notification permissions allow
+- Ending-soon warnings: when an active focus phase or `Desk break` reaches the final 5 minutes, Rhythm sends a notification with the default system sound when notification permissions allow; focus warnings are suppressed while no-rest mode is set to skip the upcoming scheduled break
 - Hidden screen-lock rest: locking the screen ends the current focus or break segment, counts lock-to-unlock time as rest, and starts a fresh focus cycle on unlock
 - Hidden sleep rest: if the Mac sleeps without being locked first, Rhythm ends the visible segment at sleep time, counts sleep as hidden rest, and keeps that hidden rest running until unlock if wake lands on a locked screen
 - Hidden app-off rest: normal quit or shutdown records the close time, then the next launch counts that gap as hidden rest; a 15-minute heartbeat provides fallback recovery for unclean exits, capped at 12 hours per gap

@@ -1294,6 +1294,40 @@ struct RhythmTDDRunner {
             return notifier.focusEndingSoonRemainingSeconds == [296, 300]
         }
 
+        failures += run("focus ending soon notification is suppressed while no-rest skips scheduled breaks") {
+            let clock = TestClock(now: Date(timeIntervalSince1970: 1_812))
+            let settings = FakeSettings(focusSeconds: 600, restSeconds: 90, skipRestEnabled: true)
+            let sessions = FakeSessionStore()
+            let overlay = FakeOverlay()
+            let lock = FakeLockMonitor()
+            let notifier = FakeBreakNotifier()
+
+            let engine = TimerEngine(
+                settingsStore: settings,
+                sessionStore: sessions,
+                overlayManager: overlay,
+                lockMonitor: lock,
+                breakNotifier: notifier,
+                nowProvider: { clock.now },
+                autoStart: false,
+                useSystemTimer: false
+            )
+
+            engine.start()
+            clock.now = clock.now.addingTimeInterval(300)
+            engine.processTick(now: clock.now)
+
+            guard notifier.focusEndingSoonRemainingSeconds.isEmpty else { return false }
+
+            clock.now = clock.now.addingTimeInterval(300)
+            engine.processTick(now: clock.now)
+
+            guard notifier.focusEndingSoonRemainingSeconds.isEmpty else { return false }
+            guard sessions.captured.count == 1 else { return false }
+            guard sessions.captured[0].skipped else { return false }
+            return sessions.captured[0].skipReason == "no_rest"
+        }
+
         failures += run("desk break ending soon notification reports actual remaining once per five minute crossing") {
             let clock = TestClock(now: Date(timeIntervalSince1970: 1_815))
             let settings = FakeSettings(focusSeconds: 12, restSeconds: 90)

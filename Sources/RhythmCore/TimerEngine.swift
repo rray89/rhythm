@@ -699,6 +699,7 @@ public final class TimerEngine: ObservableObject {
 
     private func notifyFocusEndingSoonIfNeeded(remaining: Int) {
         guard !didNotifyFocusEndingSoon else { return }
+        guard !settingsStore.skipRestEnabled else { return }
         // A warning is only useful for focus phases longer than the warning threshold.
         guard currentFocusTargetSeconds > endingSoonThresholdSeconds else { return }
         guard remaining > 0, remaining <= endingSoonThresholdSeconds else { return }
