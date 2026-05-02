@@ -86,7 +86,7 @@ The fork keeps the phase-control model already explored in the branch work:
   - extend focus by 10 minutes
   - toggle the upcoming scheduled break to `Desk break` for one cycle
   - press `Break Now` to start the selected next-break kind immediately
-  - notify once when the current focus phase reaches the final 5 minutes, using the default system notification sound when allowed
+  - notify once when the current focus phase reaches the final 5 minutes, using the default system notification sound when allowed, unless no-rest mode is enabled and the scheduled break will be skipped
 - During break:
   - extend break by 1 minute
   - extend break by 5 minutes
@@ -247,7 +247,7 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 3. `Start Break 5 Minutes Early` is unavailable when fewer than 5 minutes remain
 4. The current break phase can be extended safely by 1 or 5 minutes, and an active `Desk break` can be shortened safely by 5 minutes when at least 5 minutes remain
 5. Session history records the final planned break duration for that cycle, not the stale default value
-6. Focus warning notification fires once when a focus phase reaches the final 5 minutes and can fire again after an extension pushes the same focus phase back above the threshold
+6. Focus warning notification fires once when a focus phase reaches the final 5 minutes and can fire again after an extension pushes the same focus phase back above the threshold; it is suppressed while no-rest mode is enabled because the scheduled break will be skipped
 7. A blocking regular break can switch to `Desk break` without resetting the remaining timer
 8. The menu bar entry remains visible or recoverable in common failure scenarios
 9. The menu bar entry keeps the icon and shows a live countdown in both focus and break states without obvious jitter
