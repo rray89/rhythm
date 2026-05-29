@@ -25,9 +25,9 @@ Rhythm 是一个 macOS 节奏提醒工具，帮助用户建立稳定的「专注
 
 ## 当前功能
 
-- 自定义节奏：可设置专注间隔（10-120 分钟，5 分钟步进）和休息时长（30 秒-20 分钟，常用档位）
-- Phase 临时控制：支持 `提前休息 5 分钟`、`延长专注 5 分钟`、`延长专注 10 分钟`，以及当前休息阶段延长
-- 中英双语：支持 `中文` / `English` 界面切换；首次使用时，`zh*` 系统语言默认中文，其他语言默认英文
+- 自定义节奏：可设置专注间隔（10-120 分钟，5 分钟步进）和休息时长（30 秒-60 分钟，常用档位）
+- Phase 临时控制：支持 `提前休息 5 分钟`、`延长专注 5 分钟`、`延长专注 10 分钟`，当前休息阶段延长，以及当前 `桌前休息` 缩短 5 分钟
+- 中英双语：可在 `关于 Rhythm` 窗口切换 `中文` / `English` 界面；首次使用时，`zh*` 系统语言默认中文，其他语言默认英文
 - 每日总量：菜单中保留紧凑的 `今日` 专注 / 休息内联总量摘要，并提供快速进入数据概览的入口
 - 数据概览窗口：可从菜单打开独立窗口，查看 `今日`、`最近 7 天`、`最近 30 天`、`全部历史` 汇总、紧凑范围总量、按天浏览的 session 列表，以及按范围导出；固定范围图表会遵循当前配置的统计日切换点，而 `全部历史` 会按月聚合
 - 日切换点：可在设置中把“今天”的统计分界点调到 `00:00`-`23:00`
@@ -42,6 +42,7 @@ Rhythm 是一个 macOS 节奏提醒工具，帮助用户建立稳定的「专注
   - `桌前休息` 不锁屏，可继续使用 Mac，倒计时在菜单中继续，结束后自动恢复专注并尝试发送通知
 - 数据记录：保存专注 / 休息片段、计划时长、实际时长、结束原因，并按周写入本地 `Application Support/Rhythm/history/weeks/` JSON 历史目录；数据概览窗口提供固定范围图表，其中 `全部历史` 使用按月聚合，支持按统计日逐天浏览 session，并支持把 `今日`、`最近 7 天`、`最近 30 天`、`全部历史`、当前所选统计日 导出为 CSV 或 JSON；应用关闭恢复状态写入 `Application Support/Rhythm/state/app-lifecycle.json`
 - 菜单栏应用：常驻状态栏，保留图标并实时显示当前倒计时，快速查看状态与最近记录，同时避免两个 Rhythm 副本同时运行，包括后续从本地构建再次启动的重复副本
+- About 与直接更新：菜单可打开 `关于 Rhythm` 窗口，展示版本 / build、项目链接与直接更新控制；本地 / ad-hoc 构建会显示更新不可用，而已签名的直接发布版本可通过 Sparkle 手动检查更新、展示安装重启提示，并在用户开启后进行后台检查
 - 开机启动：支持在菜单中开启/关闭登录时启动（打包安装后可用）
 
 ## 技术栈
@@ -49,6 +50,7 @@ Rhythm 是一个 macOS 节奏提醒工具，帮助用户建立稳定的「专注
 - Swift 6
 - SwiftUI + AppKit
 - Swift Package Manager
+- Sparkle（用于已签名的直接发布更新）
 
 ## 本地运行
 
@@ -75,6 +77,28 @@ SKIP_DMG=1 ./scripts/package_dmg.sh
 
 系统通知相关测试应使用 `dist/Rhythm.app`。直接从 Xcode 或 `swift run` 启动的原始可执行文件不是标准 app bundle，因此会主动跳过系统通知。
 
+## 直接发布更新
+
+Sparkle 只在已签名的直接发布版本中启用。普通本地构建会禁用更新，避免 `swift run` 和 ad-hoc 的 `dist/Rhythm.app` 弹出不可用的更新提示。后台更新检查默认关闭，直到用户在 About 窗口中主动开启。
+
+生产直接发布需要提供 Developer ID 与 Sparkle 元数据：
+
+```bash
+RHYTHM_RELEASE=1 \
+RHYTHM_SIGNING_IDENTITY="Developer ID Application: ..." \
+RHYTHM_SPARKLE_PUBLIC_ED_KEY="..." \
+./scripts/package_dmg.sh 0.2.0
+```
+
+release 模式会创建首次安装用的 DMG，并生成 Sparkle 更新用 ZIP。公证并上传 GitHub Release 产物后，用带版本号的下载前缀更新 `appcast.xml`：
+
+```bash
+RHYTHM_DOWNLOAD_URL_PREFIX=https://github.com/rray89/rhythm/releases/download/v0.2.0 \
+  ./scripts/update_appcast.sh dist
+```
+
+默认 feed URL 是 `https://raw.githubusercontent.com/rray89/rhythm/main/appcast.xml`。
+
 ## TDD 回归检查
 
 ```bash
@@ -88,6 +112,7 @@ swift run RhythmTDD
 - 专注 / 休息 history、周目录迁移与每日总量统计
 - 数据概览快照、隐藏休息历史状态与固定范围 / 所选日期 CSV / JSON 导出
 - 专注即将结束通知
+- About / 更新相关的 release 信息格式与中英文更新文案
 - 跳过休息与 `桌前休息` 的 session 记录
 - 锁屏离屏休息与解锁后新专注周期
 - 睡眠离屏休息与唤醒后新专注周期

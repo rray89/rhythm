@@ -3,11 +3,15 @@ import RhythmCore
 import SwiftUI
 
 struct MenuBarView: View {
+    @Environment(\.dismiss) private var dismissMenu
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var timerEngine: TimerEngine
     @ObservedObject var settingsStore: SettingsStore
     @ObservedObject var sessionStore: SessionStore
     @ObservedObject var launchAtLoginManager: LaunchAtLoginManager
+    let updater: UpdaterProviding
+    @State private var updaterRevision = 0
+    @State private var hoveredUtilityMenuItem: UtilityMenuItem?
 
     private var strings: AppStrings {
         AppStrings(language: settingsStore.effectiveAppLanguage)
@@ -40,11 +44,15 @@ struct MenuBarView: View {
             configSection
             todaySection
             sessionsSection
+            timerActionSection
             actionSection
         }
         .padding(14)
         .frame(width: 392)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onReceive(updater.objectWillChange) { _ in
+            updaterRevision += 1
+        }
     }
 
     private var headerSection: some View {
@@ -172,14 +180,6 @@ struct MenuBarView: View {
                 onIncrease: increaseDayBoundaryHour
             )
 
-            languageSettingRow(
-                title: strings.languageTitle,
-                selection: Binding(
-                    get: { settingsStore.effectiveAppLanguage },
-                    set: { settingsStore.appLanguageOverride = $0 }
-                )
-            )
-
             toggleSettingRow(
                 title: strings.noRestTitle,
                 isOn: Binding(
@@ -273,6 +273,28 @@ struct MenuBarView: View {
     }
 
     private var actionSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider()
+                .padding(.bottom, 4)
+
+            utilityMenuButton(title: strings.aboutRhythmButton) {
+                openAboutWindow()
+            }
+
+            if updater.isUpdateReadyToInstall {
+                utilityMenuButton(title: strings.restartToUpdateButton, item: .restartToUpdate) {
+                    dismissMenu()
+                    updater.installUpdate()
+                }
+            }
+
+            utilityMenuButton(title: strings.quitRhythmButton, shortcut: "⌘Q", item: .quit) {
+                NSApplication.shared.terminate(nil)
+            }
+        }
+    }
+
+    private var timerActionSection: some View {
         HStack(spacing: 8) {
             if timerEngine.mode == .focusing {
                 Button(strings.startBreakNowButton) {
@@ -295,16 +317,46 @@ struct MenuBarView: View {
                 timerEngine.resetCycle()
             }
             .buttonStyle(.bordered)
-
-            Spacer()
-
-            Button(strings.quitButton) {
-                NSApplication.shared.terminate(nil)
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
         }
         .controlSize(.small)
+    }
+
+    @ViewBuilder
+    private func utilityMenuButton(
+        title: String,
+        shortcut: String? = nil,
+        item: UtilityMenuItem? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        let item = item ?? UtilityMenuItem(title)
+        let isHovered = hoveredUtilityMenuItem == item
+
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.system(size: 15.5, weight: .regular))
+                    .foregroundStyle(isHovered ? .white : .primary)
+
+                Spacer(minLength: 12)
+
+                if let shortcut {
+                    Text(shortcut)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(isHovered ? Color.white.opacity(0.82) : Color.secondary.opacity(0.52))
+                }
+            }
+            .padding(.horizontal, 11)
+            .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(isHovered ? Color.accentColor : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            hoveredUtilityMenuItem = hovering ? item : nil
+        }
     }
 
     @ViewBuilder
@@ -386,27 +438,6 @@ struct MenuBarView: View {
             .frame(width: width, alignment: .center)
             .monospacedDigit()
             .foregroundStyle(.secondary)
-    }
-
-    @ViewBuilder
-    private func languageSettingRow(title: String, selection: Binding<AppLanguage>) -> some View {
-        HStack(spacing: 10) {
-            Text(title)
-                .frame(width: settingTitleWidth, alignment: .leading)
-
-            Spacer(minLength: 0)
-
-            Picker("", selection: selection) {
-                ForEach(AppLanguage.allCases) { language in
-                    Text(strings.languageOptionLabel(language))
-                        .tag(language)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(width: 166)
-        }
-        .font(.subheadline)
     }
 
     @ViewBuilder
@@ -497,8 +528,19 @@ struct MenuBarView: View {
     }
 
     private func openInsightsWindow() {
-        openWindow(id: RhythmWindowID.insights.rawValue)
-        NSApp.activate(ignoringOtherApps: true)
+        dismissMenu()
+        DispatchQueue.main.async {
+            openWindow(id: RhythmWindowID.insights.rawValue)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    private func openAboutWindow() {
+        dismissMenu()
+        DispatchQueue.main.async {
+            openWindow(id: RhythmWindowID.about.rawValue)
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 
     @ViewBuilder
@@ -518,6 +560,16 @@ struct MenuBarView: View {
     private func sectionHeading(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
+    }
+}
+
+private enum UtilityMenuItem: Hashable {
+    case restartToUpdate
+    case quit
+    case title(String)
+
+    init(_ title: String) {
+        self = .title(title)
     }
 }
 

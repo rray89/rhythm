@@ -7,12 +7,14 @@ import SwiftUI
 final class RhythmAppDelegate: NSObject, NSApplicationDelegate {
     private let singleInstanceCoordinator: SingleInstanceCoordinator
     let isPrimaryInstance: Bool
+    let updaterController: UpdaterProviding
     private var appModelStorage: AppModel?
 
     override init() {
         let singleInstanceCoordinator = SingleInstanceCoordinator()
         self.singleInstanceCoordinator = singleInstanceCoordinator
         self.isPrimaryInstance = singleInstanceCoordinator.acquireOrActivateExistingInstance()
+        self.updaterController = makeRhythmUpdaterController()
         super.init()
 
         guard !isPrimaryInstance else { return }
@@ -204,7 +206,8 @@ struct RhythmApp: App {
                     timerEngine: appDelegate.appModel.timerEngine,
                     settingsStore: appDelegate.appModel.settingsStore,
                     sessionStore: appDelegate.appModel.sessionStore,
-                    launchAtLoginManager: appDelegate.appModel.launchAtLoginManager
+                    launchAtLoginManager: appDelegate.appModel.launchAtLoginManager,
+                    updater: appDelegate.updaterController
                 )
             } else {
                 EmptyView()
@@ -233,6 +236,18 @@ struct RhythmApp: App {
                 EmptyView()
             }
         }
+
+        Window("About Rhythm", id: RhythmWindowID.about.rawValue) {
+            if appDelegate.isPrimaryInstance {
+                AboutRhythmView(
+                    settingsStore: appDelegate.appModel.settingsStore,
+                    updater: appDelegate.updaterController
+                )
+            } else {
+                EmptyView()
+            }
+        }
+        .windowResizability(.contentSize)
     }
 
     private var guardedMenuBarInsertionBinding: Binding<Bool> {

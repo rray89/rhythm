@@ -46,7 +46,7 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - the visible `Rhythm` label is now replaced by a live countdown while keeping the icon
    - the status item can be restored if the system removes it unexpectedly
 6. The fork now supports bilingual UI:
-   - the app can switch between Chinese and English in the menu settings
+   - the app can switch between Chinese and English from the About window
    - first-run language defaults to Chinese only for `zh*` system languages, and to English otherwise
    - future user-facing features are expected to remain bilingual by default
 7. The fork now ships a lighter rest model and local history baseline:
@@ -63,6 +63,10 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - a dedicated Insights window shows Today, Last 7 Days, Last 30 Days, and All Time summaries with compact range totals
    - the Insights window browses sessions one reporting day at a time, keeps hidden rest out of the default list, and can export Today, Last 7 Days, Last 30 Days, All Time, or the selected reporting day as CSV or JSON
    - the day boundary for totals, chart buckets, and history grouping can be shifted from `00:00` to `23:00`
+9. The fork now includes a direct-release About/update baseline:
+   - the menu can open a dedicated `About Rhythm` window with version/build details, project links, and update controls
+   - local, debug, and ad-hoc builds show updates as unavailable instead of presenting broken update prompts
+   - signed direct-release builds can use Sparkle for manual update checks, signed release notes, install/relaunch prompts, and opt-in background checks from a separate update dialog
 
 ## 3. What V2 Is Trying to Improve
 
@@ -73,6 +77,8 @@ The core V2 goals are:
 1. Separate "default rhythm" from "adjustments to the current phase"
 2. Let common in-the-moment decisions happen directly from the menu bar or overlay
 3. Make bilingual UI the default product baseline for all future features, while keeping the menu lightweight and moving deeper history into a dedicated window
+4. Make direct-distribution builds easier to maintain outside the Mac App Store, starting with an About surface and a manual update check that can install and relaunch after the first manual install
+5. Keep the menu bar app lightweight enough for all-day use, with explicit attention to battery and energy impact
 
 ## 4. Product Direction for V2
 
@@ -138,7 +144,7 @@ The fork now treats bilingual UI as a shipped baseline rather than a future idea
 Current expectations:
 
 - the visible app UI supports both English and Chinese
-- the menu panel includes a language switch for `中文` and `English`
+- the About window includes a language switch for `中文` and `English`
 - first-run language follows a simple rule: `zh*` system languages use Chinese, and all other system languages use English
 - future user-facing features should ship with both Chinese and English copy instead of adding a single-language UI first
 
@@ -220,6 +226,53 @@ Current behavior:
 - hidden rest from screen lock, sleep, and app downtime counts in totals, charts, and export, but only appears in the list when the user enables `Show Hidden Rest`
 - export is explicit and scoped: Today, Last 7 Days, Last 30 Days, All Time, and the selected reporting day as CSV or JSON
 
+### 5.8 About and Direct Update Flow
+
+The fork now includes the first direct-distribution update baseline for users who install Rhythm outside the Mac App Store.
+
+The first install can remain manual: the user downloads a release asset, installs Rhythm, and launches it normally. After that first updater-capable build is installed, Rhythm provides an in-app way to check for a newer direct release and install it with a relaunch, similar to small non-App-Store macOS utilities.
+
+Expected behavior:
+
+- the menu should expose an `About Rhythm` entry or equivalent lightweight About surface
+- the About surface should show the app name, version, build number, and useful release/distribution context
+- the About surface should provide a manual `Check for Updates` action
+- background update checks should be opt-in rather than enabled silently on first launch
+- if a newer version is available, Rhythm should show clear release notes and offer to install and relaunch
+- the update flow should verify update authenticity before installation
+- release metadata should be driven by a stable direct-distribution feed, most likely backed by GitHub release tags and signed release assets
+- the update feature should not require Mac App Store distribution
+- Homebrew support is not part of this first update feature; if added later, it should be treated as a separate distribution layer that may share the same release assets
+
+Implementation direction:
+
+- use a proven macOS updater framework, such as Sparkle, instead of writing a custom updater
+- keep direct-release signing, notarization, update signing, release notes, and appcast/feed generation as part of the release pipeline design
+- preserve a clean fallback path: if update checking fails, the app should keep running and tell the user enough to manually download the latest release
+
+### 5.9 Energy and Performance Optimization
+
+Rhythm is intended to run all day in the menu bar, so high energy impact is a product issue, not just an engineering cleanup item.
+
+The performance track should start with measurement before code changes. The app should be profiled while idle, while the menu is closed, while the menu is open, during normal countdown updates, during history writes, and during overlay/notification flows. The goal is to find the specific sources of CPU wakeups, expensive redraws, disk I/O, timers, or polling before deciding what to change.
+
+Likely areas to inspect:
+
+- timer frequency and UI refresh behavior for the menu bar countdown
+- work performed while the menu panel is closed
+- history persistence and heartbeat writes
+- observers for lock, sleep, app lifecycle, and duplicate-instance monitoring
+- Insights calculations and chart data preparation
+- overlay rendering and notification preparation
+
+Expected product outcome:
+
+- Rhythm should not appear as a high-energy app during normal idle use
+- the menu bar countdown should remain accurate without unnecessary work
+- background work should be minimized when no UI is visible
+- disk writes should be batched or limited where possible without weakening app-off recovery
+- performance changes must preserve timer correctness, hidden-rest accounting, notifications, Insights totals, and duplicate-instance safety
+
 ## 6. Non-Goals
 
 This V2 draft still does not aim to add the following right away:
@@ -228,6 +281,8 @@ This V2 draft still does not aim to add the following right away:
 - multi-device sync
 - complex reporting or charting
 - task management or social pomodoro features
+- Mac App Store release work for the direct updater milestone
+- Homebrew cask distribution for the first direct updater milestone
 
 If Apple companion sync is revisited later, it should still be treated as a separate follow-on effort rather than folded into this V2 baseline. The current feasibility read is:
 
@@ -261,6 +316,10 @@ If the fork's phase-adjustment model is formalized, it should at least satisfy t
 17. Hidden rest counts in totals, trends, and export, but stays out of the default session list unless explicitly revealed
 18. Export supports explicit Today, Last 7 Days, Last 30 Days, All Time, and selected reporting-day scopes in both CSV and JSON
 19. A focusing user can toggle only the upcoming scheduled break into `Desk break`; the choice resets when that break starts or `Break Now` consumes it, and no-rest mode still records a skipped standard scheduled break instead of showing it
+20. The About surface exposes version/build information and a manual update check for direct-distribution builds
+21. The direct updater can present release notes, verify authenticity, install a downloaded update, and relaunch after the user confirms
+22. The first updater milestone does not require Mac App Store or Homebrew distribution
+23. Performance work is measurement-led and demonstrates lower energy impact without regressing countdown accuracy, hidden-rest accounting, notifications, Insights totals, or duplicate-instance protection
 
 ## 8. Open Questions
 
