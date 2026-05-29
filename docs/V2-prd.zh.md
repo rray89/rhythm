@@ -264,6 +264,8 @@ Rhythm 的定位是全天常驻菜单栏，所以高能耗表现是产品问题�
 - Insights 计算与图表数据准备
 - 遮罩渲染与通知准备
 
+首个已交付优化：菜单关闭状态的 profiling 显示，高 CPU 来自隐藏的 Insights SwiftUI 窗口仍在观察每秒 timer，并在没有 Rhythm 窗口可见时反复重建 history 快照。现在 Insights 通过不订阅刷新事件的快照 provider 读取当前阶段，并且每次渲染只基于一个 history 快照生成展示状态，因此菜单关闭时不会每秒重新计算图表、session 列表与导出范围。
+
 预期产品结果：
 
 - Rhythm 在正常空闲使用时不应被系统标记为高能耗应用

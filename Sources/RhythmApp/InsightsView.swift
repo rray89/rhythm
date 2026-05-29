@@ -3,13 +3,7 @@ import RhythmCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-private enum InsightsSessionFilter: String, CaseIterable, Identifiable {
-    case all
-    case focus
-    case rest
-
-    var id: String { rawValue }
-}
+private typealias InsightsSessionFilter = HistoryInsightsSessionFilter
 
 private struct InsightsInlineMetric: Identifiable {
     let title: String
@@ -41,9 +35,9 @@ private struct InsightsExportOption: Identifiable {
 }
 
 struct InsightsView: View {
-    @ObservedObject var timerEngine: TimerEngine
     @ObservedObject var settingsStore: SettingsStore
     @ObservedObject var sessionStore: SessionStore
+    let activeSessionSnapshot: () -> ActiveSessionSnapshot?
 
     @State private var sessionFilter: InsightsSessionFilter = .all
     @State private var showHiddenRest = false
@@ -58,90 +52,29 @@ struct InsightsView: View {
         Calendar.current
     }
 
-    private var snapshot: HistoryInsightsSnapshot {
+    private func makeSnapshot() -> HistoryInsightsSnapshot {
         sessionStore.insights(
-            activePhase: timerEngine.activeSessionSnapshot,
+            activePhase: activeSessionSnapshot(),
             dayBoundaryHour: settingsStore.dayBoundaryHour,
             now: Date()
         )
     }
 
-    private var currentReportingDayStart: Date {
-        snapshot.today.startDate
+    private func makePresentation(snapshot: HistoryInsightsSnapshot) -> HistoryInsightsPresentation {
+        HistoryInsightsPresentation(
+            snapshot: snapshot,
+            showHiddenRest: showHiddenRest,
+            selectedSessionDay: selectedSessionDay,
+            sessionFilter: sessionFilter
+        )
     }
 
-    private var dayNavigableEntries: [HistorySessionEntry] {
-        snapshot.sessionEntries.filter { entry in
-            showHiddenRest || !entry.isHiddenRest
-        }
-    }
-
-    private var availableSessionDays: [Date] {
-        Array(Set(dayNavigableEntries.map(\.reportingDayStart))).sorted(by: >)
-    }
-
-    private var preferredSelectedSessionDay: Date? {
-        if availableSessionDays.contains(currentReportingDayStart) {
-            return currentReportingDayStart
-        }
-        return availableSessionDays.first
-    }
-
-    private var resolvedSelectedSessionDay: Date? {
-        if let selectedSessionDay, availableSessionDays.contains(selectedSessionDay) {
-            return selectedSessionDay
-        }
-        return preferredSelectedSessionDay
-    }
-
-    private var selectedDayEntries: [HistorySessionEntry] {
-        guard let resolvedSelectedSessionDay else {
-            return []
-        }
-
-        return dayNavigableEntries.filter { $0.reportingDayStart == resolvedSelectedSessionDay }
-    }
-
-    private var filteredSelectedDayEntries: [HistorySessionEntry] {
-        selectedDayEntries.filter { entry in
-            switch sessionFilter {
-            case .all:
-                return true
-            case .focus:
-                return entry.kind == .focus
-            case .rest:
-                return entry.kind == .rest
-            }
-        }
-    }
-
-    private var selectedDayIndex: Int? {
-        guard let resolvedSelectedSessionDay else {
-            return nil
-        }
-        return availableSessionDays.firstIndex(of: resolvedSelectedSessionDay)
-    }
-
-    private var canSelectNewerDay: Bool {
-        guard let selectedDayIndex else {
-            return false
-        }
-        return selectedDayIndex > 0
-    }
-
-    private var canSelectOlderDay: Bool {
-        guard let selectedDayIndex else {
-            return false
-        }
-        return selectedDayIndex < availableSessionDays.count - 1
-    }
-
-    private var exportOptions: [InsightsExportOption] {
-        exportScopes.map { scope in
+    private func exportOptions(for presentation: HistoryInsightsPresentation) -> [InsightsExportOption] {
+        presentation.exportScopes.map { scope in
             let preview = sessionStore.exportPreview(
                 scope: scope,
                 dayBoundaryHour: settingsStore.dayBoundaryHour,
-                now: snapshot.generatedAt
+                now: presentation.snapshot.generatedAt
             )
             return InsightsExportOption(
                 scope: preview.scope,
@@ -151,27 +84,14 @@ struct InsightsView: View {
         }
     }
 
-    private var exportScopes: [HistoryExportScope] {
-        var scopes: [HistoryExportScope] = [
-            .today,
-            .last7Days,
-            .last30Days,
-            .allTime,
-        ]
-
-        if let resolvedSelectedSessionDay,
-           resolvedSelectedSessionDay != currentReportingDayStart {
-            scopes.append(.reportingDay(startDate: resolvedSelectedSessionDay))
-        }
-
-        return scopes
-    }
-
     var body: some View {
+        let snapshot = makeSnapshot()
+        let presentation = makePresentation(snapshot: snapshot)
+
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
                 headerSection
-                todaySection
+                todaySection(snapshot: snapshot)
                 trendSection(
                     title: strings.last7DaysTitle,
                     snapshot: snapshot.last7Days,
@@ -187,18 +107,20 @@ struct InsightsView: View {
                     snapshot: snapshot.allTime,
                     labelStyle: .monthYearCompressed
                 )
-                sessionsSection
-                exportSection
+                sessionsSection(presentation: presentation)
+                exportSection(presentation: presentation)
             }
             .padding(20)
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear(perform: syncSelectedSessionDay)
-        .onChange(of: availableSessionDays) { _ in
-            syncSelectedSessionDay()
+        .onAppear {
+            syncSelectedSessionDay(presentation: presentation)
         }
-        .onChange(of: currentReportingDayStart) { _ in
-            syncSelectedSessionDay()
+        .onChange(of: presentation.availableSessionDays) { _ in
+            syncSelectedSessionDay(presentation: presentation)
+        }
+        .onChange(of: presentation.currentReportingDayStart) { _ in
+            syncSelectedSessionDay(presentation: presentation)
         }
     }
 
@@ -215,7 +137,7 @@ struct InsightsView: View {
         }
     }
 
-    private var todaySection: some View {
+    private func todaySection(snapshot: HistoryInsightsSnapshot) -> some View {
         let today = snapshot.today
 
         return sectionContainer {
@@ -255,7 +177,7 @@ struct InsightsView: View {
         }
     }
 
-    private var sessionsSection: some View {
+    private func sessionsSection(presentation: HistoryInsightsPresentation) -> some View {
         sectionContainer {
             HStack(alignment: .center, spacing: 12) {
                 sectionHeading(strings.historySessionsTitle)
@@ -268,21 +190,21 @@ struct InsightsView: View {
                     .fixedSize()
             }
 
-            if availableSessionDays.isEmpty {
+            if presentation.availableSessionDays.isEmpty {
                 Text(strings.noHistoryYet)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if let resolvedSelectedSessionDay {
+            } else if let resolvedSelectedSessionDay = presentation.resolvedSelectedSessionDay {
                 SessionDayStripView(
-                    days: availableSessionDays,
+                    days: presentation.availableSessionDays,
                     selectedDay: resolvedSelectedSessionDay,
-                    canSelectNewerDay: canSelectNewerDay,
-                    canSelectOlderDay: canSelectOlderDay,
+                    canSelectNewerDay: presentation.canSelectNewerDay,
+                    canSelectOlderDay: presentation.canSelectOlderDay,
                     strings: strings,
                     calendar: calendar,
                     locale: displayLocale,
-                    selectNewerDay: selectNewerDay,
-                    selectOlderDay: selectOlderDay,
+                    selectNewerDay: { selectNewerDay(presentation: presentation) },
+                    selectOlderDay: { selectOlderDay(presentation: presentation) },
                     selectDay: { selectedSessionDay = $0 }
                 )
 
@@ -291,7 +213,7 @@ struct InsightsView: View {
                         Text(dayHeaderLabel(for: resolvedSelectedSessionDay))
                             .font(.subheadline.weight(.semibold))
 
-                        Text(strings.sessionCountLabel(filteredSelectedDayEntries.count))
+                        Text(strings.sessionCountLabel(presentation.filteredSelectedDayEntries.count))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -308,13 +230,13 @@ struct InsightsView: View {
                     .frame(width: 190)
                 }
 
-                if filteredSelectedDayEntries.isEmpty {
+                if presentation.filteredSelectedDayEntries.isEmpty {
                     Text(strings.noSessionsYet)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(filteredSelectedDayEntries.enumerated()), id: \.element.id) { item in
+                        ForEach(Array(presentation.filteredSelectedDayEntries.enumerated()), id: \.element.id) { item in
                             SessionRowView(
                                 entry: item.element,
                                 strings: strings,
@@ -322,7 +244,7 @@ struct InsightsView: View {
                                 summaryLabel: sessionSummaryLabel(for: item.element)
                             )
 
-                            if item.offset < filteredSelectedDayEntries.count - 1 {
+                            if item.offset < presentation.filteredSelectedDayEntries.count - 1 {
                                 Divider()
                                     .padding(.vertical, 8)
                             }
@@ -333,15 +255,15 @@ struct InsightsView: View {
         }
     }
 
-    private var exportSection: some View {
+    private func exportSection(presentation: HistoryInsightsPresentation) -> some View {
         sectionContainer {
             HStack {
                 sectionHeading(strings.exportTitle)
                 Spacer(minLength: 0)
 
                 Menu(strings.exportTitle) {
-                    exportMenuSection(for: .csv)
-                    exportMenuSection(for: .json)
+                    exportMenuSection(for: .csv, presentation: presentation)
+                    exportMenuSection(for: .json, presentation: presentation)
                 }
                 .menuStyle(.borderlessButton)
             }
@@ -355,9 +277,9 @@ struct InsightsView: View {
     }
 
     @ViewBuilder
-    private func exportMenuSection(for format: HistoryExportFormat) -> some View {
+    private func exportMenuSection(for format: HistoryExportFormat, presentation: HistoryInsightsPresentation) -> some View {
         Section(strings.exportFormatTitle(format)) {
-            ForEach(exportOptions) { option in
+            ForEach(exportOptions(for: presentation)) { option in
                 Button(strings.exportMenuLabel(title: option.title, count: option.count)) {
                     export(scope: option.scope, format: format)
                 }
@@ -542,8 +464,8 @@ struct InsightsView: View {
             .font(.headline.weight(.semibold))
     }
 
-    private func syncSelectedSessionDay() {
-        guard let preferredSelectedSessionDay else {
+    private func syncSelectedSessionDay(presentation: HistoryInsightsPresentation) {
+        guard let preferredSelectedSessionDay = presentation.preferredSelectedSessionDay else {
             selectedSessionDay = nil
             return
         }
@@ -553,25 +475,25 @@ struct InsightsView: View {
             return
         }
 
-        if !availableSessionDays.contains(selectedSessionDay) {
+        if !presentation.availableSessionDays.contains(selectedSessionDay) {
             self.selectedSessionDay = preferredSelectedSessionDay
         }
     }
 
-    private func selectNewerDay() {
-        guard let selectedDayIndex, canSelectNewerDay else {
+    private func selectNewerDay(presentation: HistoryInsightsPresentation) {
+        guard let selectedDayIndex = presentation.selectedDayIndex, presentation.canSelectNewerDay else {
             return
         }
 
-        selectedSessionDay = availableSessionDays[selectedDayIndex - 1]
+        selectedSessionDay = presentation.availableSessionDays[selectedDayIndex - 1]
     }
 
-    private func selectOlderDay() {
-        guard let selectedDayIndex, canSelectOlderDay else {
+    private func selectOlderDay(presentation: HistoryInsightsPresentation) {
+        guard let selectedDayIndex = presentation.selectedDayIndex, presentation.canSelectOlderDay else {
             return
         }
 
-        selectedSessionDay = availableSessionDays[selectedDayIndex + 1]
+        selectedSessionDay = presentation.availableSessionDays[selectedDayIndex + 1]
     }
 }
 
