@@ -60,9 +60,9 @@ struct InsightsView: View {
         )
     }
 
-    private func makePresentation(snapshot: HistoryInsightsSnapshot) -> HistoryInsightsPresentation {
-        HistoryInsightsPresentation(
-            snapshot: snapshot,
+    private func makePresentation() -> HistoryInsightsPresentation {
+        HistoryInsightsPresentation.make(
+            snapshotProvider: makeSnapshot,
             showHiddenRest: showHiddenRest,
             selectedSessionDay: selectedSessionDay,
             sessionFilter: sessionFilter
@@ -85,8 +85,8 @@ struct InsightsView: View {
     }
 
     var body: some View {
-        let snapshot = makeSnapshot()
-        let presentation = makePresentation(snapshot: snapshot)
+        let presentation = makePresentation()
+        let snapshot = presentation.snapshot
 
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
