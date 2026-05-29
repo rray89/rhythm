@@ -46,7 +46,7 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
    - the visible `Rhythm` label is now replaced by a live countdown while keeping the icon
    - the status item can be restored if the system removes it unexpectedly
 6. The fork now supports bilingual UI:
-   - the app can switch between Chinese and English in the menu settings
+   - the app can switch between Chinese and English from the About window
    - first-run language defaults to Chinese only for `zh*` system languages, and to English otherwise
    - future user-facing features are expected to remain bilingual by default
 7. The fork now ships a lighter rest model and local history baseline:
@@ -144,7 +144,7 @@ The fork now treats bilingual UI as a shipped baseline rather than a future idea
 Current expectations:
 
 - the visible app UI supports both English and Chinese
-- the menu panel includes a language switch for `中文` and `English`
+- the About window includes a language switch for `中文` and `English`
 - first-run language follows a simple rule: `zh*` system languages use Chinese, and all other system languages use English
 - future user-facing features should ship with both Chinese and English copy instead of adding a single-language UI first
 

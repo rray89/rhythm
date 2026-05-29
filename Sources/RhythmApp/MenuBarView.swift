@@ -9,6 +9,7 @@ struct MenuBarView: View {
     @ObservedObject var sessionStore: SessionStore
     @ObservedObject var launchAtLoginManager: LaunchAtLoginManager
     let updater: UpdaterProviding
+    @State private var updaterRevision = 0
 
     private var strings: AppStrings {
         AppStrings(language: settingsStore.effectiveAppLanguage)
@@ -41,11 +42,15 @@ struct MenuBarView: View {
             configSection
             todaySection
             sessionsSection
+            timerActionSection
             actionSection
         }
         .padding(14)
         .frame(width: 392)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onReceive(updater.objectWillChange) { _ in
+            updaterRevision += 1
+        }
     }
 
     private var headerSection: some View {
@@ -173,14 +178,6 @@ struct MenuBarView: View {
                 onIncrease: increaseDayBoundaryHour
             )
 
-            languageSettingRow(
-                title: strings.languageTitle,
-                selection: Binding(
-                    get: { settingsStore.effectiveAppLanguage },
-                    set: { settingsStore.appLanguageOverride = $0 }
-                )
-            )
-
             toggleSettingRow(
                 title: strings.noRestTitle,
                 isOn: Binding(
@@ -274,6 +271,27 @@ struct MenuBarView: View {
     }
 
     private var actionSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider()
+                .padding(.bottom, 4)
+
+            utilityMenuButton(title: strings.aboutRhythmButton) {
+                openAboutWindow()
+            }
+
+            if updater.isUpdateReadyToInstall {
+                utilityMenuButton(title: strings.restartToUpdateButton) {
+                    updater.installUpdate()
+                }
+            }
+
+            utilityMenuButton(title: strings.quitRhythmButton, shortcut: "⌘Q") {
+                NSApplication.shared.terminate(nil)
+            }
+        }
+    }
+
+    private var timerActionSection: some View {
         HStack(spacing: 8) {
             if timerEngine.mode == .focusing {
                 Button(strings.startBreakNowButton) {
@@ -296,22 +314,30 @@ struct MenuBarView: View {
                 timerEngine.resetCycle()
             }
             .buttonStyle(.bordered)
-
-            Spacer()
-
-            Button(strings.aboutRhythmButton) {
-                openAboutWindow()
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-
-            Button(strings.quitButton) {
-                NSApplication.shared.terminate(nil)
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
         }
         .controlSize(.small)
+    }
+
+    @ViewBuilder
+    private func utilityMenuButton(title: String, shortcut: String? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.system(size: 15.5, weight: .regular))
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 12)
+
+                if let shortcut {
+                    Text(shortcut)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -393,27 +419,6 @@ struct MenuBarView: View {
             .frame(width: width, alignment: .center)
             .monospacedDigit()
             .foregroundStyle(.secondary)
-    }
-
-    @ViewBuilder
-    private func languageSettingRow(title: String, selection: Binding<AppLanguage>) -> some View {
-        HStack(spacing: 10) {
-            Text(title)
-                .frame(width: settingTitleWidth, alignment: .leading)
-
-            Spacer(minLength: 0)
-
-            Picker("", selection: selection) {
-                ForEach(AppLanguage.allCases) { language in
-                    Text(strings.languageOptionLabel(language))
-                        .tag(language)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(width: 166)
-        }
-        .font(.subheadline)
     }
 
     @ViewBuilder

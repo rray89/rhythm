@@ -28,10 +28,18 @@ struct AboutRhythmView: View {
         )
     }
 
+    private var languageBinding: Binding<AppLanguage> {
+        Binding(
+            get: { settingsStore.effectiveAppLanguage },
+            set: { settingsStore.appLanguageOverride = $0 }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             appIdentitySection
             linkSection
+            languageSection
             updateSection
             copyrightSection
         }
@@ -121,8 +129,29 @@ struct AboutRhythmView: View {
         }
     }
 
+    private var languageSection: some View {
+        HStack(spacing: 16) {
+            Text(strings.languageTitle)
+                .font(.headline)
+
+            Spacer()
+
+            Picker("", selection: languageBinding) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(strings.languageOptionLabel(language))
+                        .tag(language)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 178)
+        }
+    }
+
     private var updateSection: some View {
         VStack(spacing: 10) {
+            Divider()
+
             Toggle(strings.autoUpdateToggleTitle, isOn: autoUpdateBinding)
                 .toggleStyle(.checkbox)
                 .disabled(!updater.canCheckForUpdates)

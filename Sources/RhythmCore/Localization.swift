@@ -400,8 +400,16 @@ public struct AppStrings {
         localized(chinese: "退出", english: "Quit")
     }
 
+    public var quitRhythmButton: String {
+        localized(chinese: "退出 Rhythm", english: "Quit Rhythm")
+    }
+
     public var aboutRhythmButton: String {
         localized(chinese: "关于 Rhythm", english: "About Rhythm")
+    }
+
+    public var restartToUpdateButton: String {
+        localized(chinese: "重启以更新", english: "Restart to update")
     }
 
     public var aboutRhythmTitle: String {

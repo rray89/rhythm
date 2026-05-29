@@ -175,6 +175,10 @@ struct RhythmTDDRunner {
             guard chinese.breakCompletedNotificationBody(for: .desk) == "Rhythm 已恢复专注计时。" else { return false }
             guard english.aboutRhythmButton == "About Rhythm" else { return false }
             guard chinese.aboutRhythmButton == "关于 Rhythm" else { return false }
+            guard english.restartToUpdateButton == "Restart to update" else { return false }
+            guard chinese.restartToUpdateButton == "重启以更新" else { return false }
+            guard english.quitRhythmButton == "Quit Rhythm" else { return false }
+            guard chinese.quitRhythmButton == "退出 Rhythm" else { return false }
             guard english.checkForUpdatesButton == "Check for Updates..." else { return false }
             guard chinese.checkForUpdatesButton == "检查更新..." else { return false }
             guard english.autoUpdateToggleTitle == "Automatically download updates" else { return false }
