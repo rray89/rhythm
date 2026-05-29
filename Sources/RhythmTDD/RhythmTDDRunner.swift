@@ -2081,6 +2081,75 @@ struct RhythmTDDRunner {
             return hiddenRestEntry.isHiddenRest
         }
 
+        failures += run("insights presentation consumes one history snapshot") {
+            let todayStart = makeUTCDate(year: 2026, month: 4, day: 10, hour: 4, minute: 0)
+            let nextDayStart = makeUTCDate(year: 2026, month: 4, day: 11, hour: 4, minute: 0)
+            let visibleEntry = HistorySessionEntry(
+                sessionID: UUID(),
+                reportingDayStart: todayStart,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 9, minute: 0),
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 9, minute: 25),
+                kind: .focus,
+                scheduledSeconds: 1_500,
+                actualSeconds: 1_500,
+                breakKind: nil,
+                restSource: nil,
+                skipped: false,
+                skipReason: nil,
+                focusEndReason: .scheduledBreak,
+                createdAt: todayStart
+            )
+            let hiddenEntry = HistorySessionEntry(
+                sessionID: UUID(),
+                reportingDayStart: todayStart,
+                startedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 10, minute: 0),
+                endedAt: makeUTCDate(year: 2026, month: 4, day: 10, hour: 10, minute: 10),
+                kind: .rest,
+                scheduledSeconds: 600,
+                actualSeconds: 600,
+                breakKind: .standard,
+                restSource: .screenLock,
+                skipped: false,
+                skipReason: nil,
+                focusEndReason: nil,
+                createdAt: todayStart
+            )
+            let range = HistoryRangeSnapshot(
+                kind: .today,
+                startDate: todayStart,
+                endDate: nextDayStart,
+                focusSeconds: 1_500,
+                restSeconds: 600,
+                trendBuckets: []
+            )
+            let snapshot = HistoryInsightsSnapshot(
+                generatedAt: todayStart,
+                dayBoundaryHour: 4,
+                today: range,
+                last7Days: range,
+                last30Days: range,
+                allTime: range,
+                sessionEntries: [visibleEntry, hiddenEntry]
+            )
+            var snapshotRequestCount = 0
+
+            let presentation = HistoryInsightsPresentation.make(
+                snapshotProvider: {
+                    snapshotRequestCount += 1
+                    return snapshot
+                },
+                showHiddenRest: false,
+                selectedSessionDay: nil,
+                sessionFilter: .all
+            )
+
+            guard snapshotRequestCount == 1 else { return false }
+            guard presentation.availableSessionDays == [todayStart] else { return false }
+            guard presentation.filteredSelectedDayEntries.map(\.sessionID) == [visibleEntry.sessionID] else { return false }
+            guard presentation.exportScopes == [.today, .last7Days, .last30Days, .allTime] else { return false }
+            return presentation.canSelectNewerDay == false && presentation.canSelectOlderDay == false
+        }
+
         failures += run("history export scopes emit csv and json for matching sessions only") {
             let tempDirectory = makeTemporaryDirectory()
             defer { try? FileManager.default.removeItem(at: tempDirectory) }

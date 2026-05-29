@@ -227,9 +227,9 @@ struct RhythmApp: App {
         Window("Rhythm", id: RhythmWindowID.insights.rawValue) {
             if appDelegate.isPrimaryInstance {
                 InsightsView(
-                    timerEngine: appDelegate.appModel.timerEngine,
                     settingsStore: appDelegate.appModel.settingsStore,
-                    sessionStore: appDelegate.appModel.sessionStore
+                    sessionStore: appDelegate.appModel.sessionStore,
+                    activeSessionSnapshot: { appDelegate.appModel.timerEngine.activeSessionSnapshot }
                 )
                 .frame(minWidth: 860, minHeight: 760)
             } else {

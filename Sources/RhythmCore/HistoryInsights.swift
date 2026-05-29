@@ -151,6 +151,108 @@ public struct HistoryInsightsSnapshot: Codable, Sendable {
     }
 }
 
+public enum HistoryInsightsSessionFilter: String, CaseIterable, Identifiable, Sendable {
+    case all
+    case focus
+    case rest
+
+    public var id: String { rawValue }
+}
+
+public struct HistoryInsightsPresentation: Sendable {
+    public let snapshot: HistoryInsightsSnapshot
+    public let currentReportingDayStart: Date
+    public let dayNavigableEntries: [HistorySessionEntry]
+    public let availableSessionDays: [Date]
+    public let preferredSelectedSessionDay: Date?
+    public let resolvedSelectedSessionDay: Date?
+    public let selectedDayEntries: [HistorySessionEntry]
+    public let filteredSelectedDayEntries: [HistorySessionEntry]
+    public let selectedDayIndex: Int?
+    public let canSelectNewerDay: Bool
+    public let canSelectOlderDay: Bool
+    public let exportScopes: [HistoryExportScope]
+
+    public static func make(
+        snapshotProvider: () -> HistoryInsightsSnapshot,
+        showHiddenRest: Bool,
+        selectedSessionDay: Date?,
+        sessionFilter: HistoryInsightsSessionFilter
+    ) -> HistoryInsightsPresentation {
+        HistoryInsightsPresentation(
+            snapshot: snapshotProvider(),
+            showHiddenRest: showHiddenRest,
+            selectedSessionDay: selectedSessionDay,
+            sessionFilter: sessionFilter
+        )
+    }
+
+    public init(
+        snapshot: HistoryInsightsSnapshot,
+        showHiddenRest: Bool,
+        selectedSessionDay: Date?,
+        sessionFilter: HistoryInsightsSessionFilter
+    ) {
+        self.snapshot = snapshot
+        self.currentReportingDayStart = snapshot.today.startDate
+
+        let dayNavigableEntries = snapshot.sessionEntries.filter { entry in
+            showHiddenRest || !entry.isHiddenRest
+        }
+        self.dayNavigableEntries = dayNavigableEntries
+
+        let availableSessionDays = Array(Set(dayNavigableEntries.map(\.reportingDayStart))).sorted(by: >)
+        self.availableSessionDays = availableSessionDays
+
+        let preferredSelectedSessionDay: Date?
+        if availableSessionDays.contains(snapshot.today.startDate) {
+            preferredSelectedSessionDay = snapshot.today.startDate
+        } else {
+            preferredSelectedSessionDay = availableSessionDays.first
+        }
+        self.preferredSelectedSessionDay = preferredSelectedSessionDay
+
+        let resolvedSelectedSessionDay: Date?
+        if let selectedSessionDay, availableSessionDays.contains(selectedSessionDay) {
+            resolvedSelectedSessionDay = selectedSessionDay
+        } else {
+            resolvedSelectedSessionDay = preferredSelectedSessionDay
+        }
+        self.resolvedSelectedSessionDay = resolvedSelectedSessionDay
+
+        let selectedDayEntries: [HistorySessionEntry]
+        if let resolvedSelectedSessionDay {
+            selectedDayEntries = dayNavigableEntries.filter { $0.reportingDayStart == resolvedSelectedSessionDay }
+        } else {
+            selectedDayEntries = []
+        }
+        self.selectedDayEntries = selectedDayEntries
+
+        self.filteredSelectedDayEntries = selectedDayEntries.filter { entry in
+            switch sessionFilter {
+            case .all:
+                return true
+            case .focus:
+                return entry.kind == .focus
+            case .rest:
+                return entry.kind == .rest
+            }
+        }
+
+        let selectedDayIndex = resolvedSelectedSessionDay.flatMap { availableSessionDays.firstIndex(of: $0) }
+        self.selectedDayIndex = selectedDayIndex
+        self.canSelectNewerDay = selectedDayIndex.map { $0 > 0 } ?? false
+        self.canSelectOlderDay = selectedDayIndex.map { $0 < availableSessionDays.count - 1 } ?? false
+
+        var exportScopes: [HistoryExportScope] = [.today, .last7Days, .last30Days, .allTime]
+        if let resolvedSelectedSessionDay,
+           resolvedSelectedSessionDay != snapshot.today.startDate {
+            exportScopes.append(.reportingDay(startDate: resolvedSelectedSessionDay))
+        }
+        self.exportScopes = exportScopes
+    }
+}
+
 public enum HistoryExportFormat: String, Sendable {
     case csv
     case json
