@@ -133,14 +133,20 @@ cat > "$CONTENTS_DIR/Info.plist" <<EOF
     <string>${BUILD_TIMESTAMP}</string>
     <key>RhythmGitCommit</key>
     <string>${GIT_COMMIT}</string>
+EOF
+
+if [[ "$RHYTHM_RELEASE" == "1" ]]; then
+  cat >> "$CONTENTS_DIR/Info.plist" <<EOF
     <key>SUFeedURL</key>
-    <string>$([[ "$RHYTHM_RELEASE" == "1" ]] && printf "%s" "$FEED_URL")</string>
+    <string>${FEED_URL}</string>
     <key>SUPublicEDKey</key>
     <string>${SPARKLE_PUBLIC_ED_KEY}</string>
-    <key>SUEnableAutomaticChecks</key>
-    <$([[ "$RHYTHM_RELEASE" == "1" ]] && printf "true" || printf "false")/>
     <key>SUAutomaticallyUpdate</key>
     <false/>
+EOF
+fi
+
+cat >> "$CONTENTS_DIR/Info.plist" <<EOF
 </dict>
 </plist>
 EOF

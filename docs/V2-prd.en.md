@@ -66,7 +66,7 @@ This fork now ships the following behavior beyond the upstream V1 baseline:
 9. The fork now includes a direct-release About/update baseline:
    - the menu can open a dedicated `About Rhythm` window with version/build details, project links, and update controls
    - local, debug, and ad-hoc builds show updates as unavailable instead of presenting broken update prompts
-   - signed direct-release builds can enable Sparkle update checks, signed release notes, and install/relaunch prompts from a separate update dialog
+   - signed direct-release builds can use Sparkle for manual update checks, signed release notes, install/relaunch prompts, and opt-in background checks from a separate update dialog
 
 ## 3. What V2 Is Trying to Improve
 
@@ -237,6 +237,7 @@ Expected behavior:
 - the menu should expose an `About Rhythm` entry or equivalent lightweight About surface
 - the About surface should show the app name, version, build number, and useful release/distribution context
 - the About surface should provide a manual `Check for Updates` action
+- background update checks should be opt-in rather than enabled silently on first launch
 - if a newer version is available, Rhythm should show clear release notes and offer to install and relaunch
 - the update flow should verify update authenticity before installation
 - release metadata should be driven by a stable direct-distribution feed, most likely backed by GitHub release tags and signed release assets

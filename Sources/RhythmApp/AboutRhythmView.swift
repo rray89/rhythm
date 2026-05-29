@@ -19,11 +19,11 @@ struct AboutRhythmView: View {
 
     private var autoUpdateBinding: Binding<Bool> {
         Binding(
-            get: { updater.automaticallyChecksForUpdates && updater.automaticallyDownloadsUpdates },
+            get: { updater.automaticallyChecksForUpdates },
             set: { newValue in
-                UserDefaults.standard.set(newValue, forKey: "rhythmAutoUpdateEnabled")
+                UserDefaults.standard.set(newValue, forKey: "rhythmAutomaticallyChecksForUpdates")
                 updater.automaticallyChecksForUpdates = newValue
-                updater.automaticallyDownloadsUpdates = newValue
+                updater.automaticallyDownloadsUpdates = false
             }
         )
     }

@@ -181,8 +181,8 @@ struct RhythmTDDRunner {
             guard chinese.quitRhythmButton == "退出 Rhythm" else { return false }
             guard english.checkForUpdatesButton == "Check for Updates..." else { return false }
             guard chinese.checkForUpdatesButton == "检查更新..." else { return false }
-            guard english.autoUpdateToggleTitle == "Automatically download updates" else { return false }
-            guard chinese.autoUpdateToggleTitle == "自动下载更新" else { return false }
+            guard english.autoUpdateToggleTitle == "Automatically check for updates" else { return false }
+            guard chinese.autoUpdateToggleTitle == "自动检查更新" else { return false }
             guard chinese.dayCutoffValue(4) == "04:00" else { return false }
             guard english.weekdayTrendLabel(2) == "Mo" else { return false }
             return BreakPreset.longBreaks == [.deskBreak]
@@ -226,6 +226,14 @@ struct RhythmTDDRunner {
             guard localBuild.localizedMessage(language: .chinese) == "当前本地构建暂不支持更新。" else { return false }
             guard unsignedBuild.localizedMessage(language: .english) == "Updates require a signed direct-release build." else { return false }
             return unsignedBuild.localizedMessage(language: .chinese) == "更新需要已签名的直接发布版本。"
+        }
+
+        failures += run("release packaging leaves automatic update check consent to Sparkle") {
+            let scriptPath = FileManager.default.currentDirectoryPath + "/scripts/package_dmg.sh"
+            guard let script = try? String(contentsOfFile: scriptPath, encoding: .utf8) else {
+                return false
+            }
+            return !script.contains("SUEnableAutomaticChecks")
         }
 
         failures += run("menu bar accessibility labels are localized") {

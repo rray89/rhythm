@@ -437,7 +437,7 @@ public struct AppStrings {
     }
 
     public var autoUpdateToggleTitle: String {
-        localized(chinese: "自动下载更新", english: "Automatically download updates")
+        localized(chinese: "自动检查更新", english: "Automatically check for updates")
     }
 
     public var checkForUpdatesButton: String {

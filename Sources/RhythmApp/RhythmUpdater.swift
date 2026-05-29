@@ -63,11 +63,11 @@ final class SparkleUpdaterController: NSObject, ObservableObject, UpdaterProvidi
     @Published var canCheckForUpdates: Bool = false
     @Published var isUpdateReadyToInstall: Bool = false
 
-    init(savedAutomaticUpdates: Bool) {
+    init(automaticallyChecksForUpdates: Bool) {
         super.init()
         let updater = standardController.updater
-        updater.automaticallyChecksForUpdates = savedAutomaticUpdates
-        updater.automaticallyDownloadsUpdates = savedAutomaticUpdates
+        updater.automaticallyChecksForUpdates = automaticallyChecksForUpdates
+        updater.automaticallyDownloadsUpdates = false
         canCheckForUpdates = updater.canCheckForUpdates
         cancellable = updater.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak self] updater, _ in
             Task { @MainActor [weak self] in
@@ -185,9 +185,9 @@ func makeRhythmUpdaterController() -> UpdaterProviding {
 
     #if canImport(Sparkle)
     let defaults = UserDefaults.standard
-    let key = "rhythmAutoUpdateEnabled"
-    let savedAutomaticUpdates = (defaults.object(forKey: key) as? Bool) ?? true
-    return SparkleUpdaterController(savedAutomaticUpdates: savedAutomaticUpdates)
+    let key = "rhythmAutomaticallyChecksForUpdates"
+    let automaticallyChecksForUpdates = (defaults.object(forKey: key) as? Bool) ?? false
+    return SparkleUpdaterController(automaticallyChecksForUpdates: automaticallyChecksForUpdates)
     #else
     return DisabledUpdaterController(reason: .unsupportedBuild)
     #endif

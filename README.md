@@ -43,7 +43,7 @@ This README describes the behavior currently shipped in this fork. If you want t
   - `Desk break` stays non-blocking, keeps the Mac usable, can be shortened by 5 minutes from the menu, continues counting down in the menu, sends a final-5-minute warning for breaks longer than 5 minutes, and automatically returns to focus with a completion notification when possible
 - Local history: focus and rest sessions, planned durations, actual durations, and end reasons are stored in weekly JSON history under `Application Support/Rhythm/history/weeks/`; the Insights window keeps fixed-range charts, uses monthly aggregation for `All Time`, browses sessions one reporting day at a time, and exports `Today`, `Last 7 Days`, `Last 30 Days`, `All Time`, or the selected reporting day as CSV or JSON; app-off recovery state lives in `Application Support/Rhythm/state/app-lifecycle.json`
 - Menu bar app: stays in the status bar, keeps the icon visible, shows a live countdown for quick status checks and recent history, and prevents two Rhythm copies from running at the same time, including later duplicate launches from local builds
-- About and direct updates: the menu opens an `About Rhythm` window with version/build details, project links, and direct-update controls; local/ad-hoc builds show updates as unavailable, while signed direct-release builds can use Sparkle for update checks and install/relaunch prompts
+- About and direct updates: the menu opens an `About Rhythm` window with version/build details, project links, and direct-update controls; local/ad-hoc builds show updates as unavailable, while signed direct-release builds can use Sparkle for manual update checks, install/relaunch prompts, and opt-in background checks
 - Launch at login: can be enabled or disabled from the menu after the app is installed normally
 
 ## Tech Stack
@@ -80,7 +80,7 @@ System notification checks should use `dist/Rhythm.app`. Raw Xcode / `swift run`
 
 ## Direct Release Updates
 
-Sparkle is enabled only for signed direct-release builds. Normal local builds keep updates disabled so `swift run` and ad-hoc `dist/Rhythm.app` bundles do not show broken update prompts.
+Sparkle is enabled only for signed direct-release builds. Normal local builds keep updates disabled so `swift run` and ad-hoc `dist/Rhythm.app` bundles do not show broken update prompts. Background update checks are off by default until the user enables them in the About window.
 
 For a production direct release, provide Developer ID and Sparkle metadata:
 
