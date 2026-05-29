@@ -173,9 +173,55 @@ struct RhythmTDDRunner {
             guard english.breakPresetTitle(.desk) == "Desk break" else { return false }
             guard english.breakCompletedNotificationTitle(for: .desk) == "Desk break finished" else { return false }
             guard chinese.breakCompletedNotificationBody(for: .desk) == "Rhythm 已恢复专注计时。" else { return false }
+            guard english.aboutRhythmButton == "About Rhythm" else { return false }
+            guard chinese.aboutRhythmButton == "关于 Rhythm" else { return false }
+            guard english.checkForUpdatesButton == "Check for Updates..." else { return false }
+            guard chinese.checkForUpdatesButton == "检查更新..." else { return false }
+            guard english.autoUpdateToggleTitle == "Automatically download updates" else { return false }
+            guard chinese.autoUpdateToggleTitle == "自动下载更新" else { return false }
             guard chinese.dayCutoffValue(4) == "04:00" else { return false }
             guard english.weekdayTrendLabel(2) == "Mo" else { return false }
             return BreakPreset.longBreaks == [.deskBreak]
+        }
+
+        failures += run("release info formats version build and metadata") {
+            let info = RhythmReleaseInfo(
+                version: "0.2.0",
+                build: "42",
+                buildTimestamp: "2026-05-28T23:30:00Z",
+                gitCommit: "abc1234"
+            )
+
+            guard info.versionDisplay == "Version 0.2.0 (42)" else {
+                return false
+            }
+            let englishBuild = info.buildDisplay(language: .english, timeZone: TimeZone(secondsFromGMT: 0)!)
+            let chineseBuild = info.buildDisplay(language: .chinese, timeZone: TimeZone(secondsFromGMT: 0)!)
+            guard englishBuild == "Built May 28, 2026 23:30 (abc1234)" else {
+                return false
+            }
+            guard chineseBuild == "构建于 2026年5月28日 23:30（abc1234）" else {
+                return false
+            }
+            return true
+        }
+
+        failures += run("release info tolerates missing optional metadata") {
+            let info = RhythmReleaseInfo(version: nil, build: nil, buildTimestamp: nil, gitCommit: nil)
+
+            guard info.versionDisplay == "Version -" else { return false }
+            guard info.buildDisplay(language: .english, timeZone: TimeZone(secondsFromGMT: 0)!) == nil else { return false }
+            return info.buildDisplay(language: .chinese, timeZone: TimeZone(secondsFromGMT: 0)!) == nil
+        }
+
+        failures += run("disabled update status is localized") {
+            let localBuild = RhythmUpdateAvailability.disabled(.localBuild)
+            let unsignedBuild = RhythmUpdateAvailability.disabled(.unsignedBuild)
+
+            guard localBuild.localizedMessage(language: .english) == "Updates are unavailable in this local build." else { return false }
+            guard localBuild.localizedMessage(language: .chinese) == "当前本地构建暂不支持更新。" else { return false }
+            guard unsignedBuild.localizedMessage(language: .english) == "Updates require a signed direct-release build." else { return false }
+            return unsignedBuild.localizedMessage(language: .chinese) == "更新需要已签名的直接发布版本。"
         }
 
         failures += run("menu bar accessibility labels are localized") {

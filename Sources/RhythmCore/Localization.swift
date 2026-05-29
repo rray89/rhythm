@@ -400,6 +400,54 @@ public struct AppStrings {
         localized(chinese: "退出", english: "Quit")
     }
 
+    public var aboutRhythmButton: String {
+        localized(chinese: "关于 Rhythm", english: "About Rhythm")
+    }
+
+    public var aboutRhythmTitle: String {
+        localized(chinese: "关于 Rhythm", english: "About Rhythm")
+    }
+
+    public var aboutTagline: String {
+        localized(chinese: "让专注和休息保持稳定节奏。", english: "A steady focus and rest rhythm for macOS.")
+    }
+
+    public var githubLinkTitle: String {
+        localized(chinese: "GitHub", english: "GitHub")
+    }
+
+    public var releasesLinkTitle: String {
+        localized(chinese: "发布版本", english: "Releases")
+    }
+
+    public var licenseLinkTitle: String {
+        localized(chinese: "许可证", english: "License")
+    }
+
+    public var licenseValue: String {
+        localized(chinese: "MIT License", english: "MIT License")
+    }
+
+    public var autoUpdateToggleTitle: String {
+        localized(chinese: "自动下载更新", english: "Automatically download updates")
+    }
+
+    public var checkForUpdatesButton: String {
+        localized(chinese: "检查更新...", english: "Check for Updates...")
+    }
+
+    public var installUpdateButton: String {
+        localized(chinese: "安装并重启", english: "Install and Relaunch")
+    }
+
+    public var directReleaseOnlyLabel: String {
+        localized(chinese: "仅限直接发布版本", english: "Direct releases only")
+    }
+
+    public var updaterReadyToInstallLabel: String {
+        localized(chinese: "更新已下载，可安装并重启。", english: "Update downloaded and ready to install.")
+    }
+
     public var breakTimeTitle: String {
         localized(chinese: "休息时间", english: "Break Time")
     }

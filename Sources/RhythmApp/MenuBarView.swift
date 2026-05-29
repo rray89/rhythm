@@ -8,6 +8,7 @@ struct MenuBarView: View {
     @ObservedObject var settingsStore: SettingsStore
     @ObservedObject var sessionStore: SessionStore
     @ObservedObject var launchAtLoginManager: LaunchAtLoginManager
+    let updater: UpdaterProviding
 
     private var strings: AppStrings {
         AppStrings(language: settingsStore.effectiveAppLanguage)
@@ -298,6 +299,12 @@ struct MenuBarView: View {
 
             Spacer()
 
+            Button(strings.aboutRhythmButton) {
+                openAboutWindow()
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+
             Button(strings.quitButton) {
                 NSApplication.shared.terminate(nil)
             }
@@ -498,6 +505,11 @@ struct MenuBarView: View {
 
     private func openInsightsWindow() {
         openWindow(id: RhythmWindowID.insights.rawValue)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func openAboutWindow() {
+        openWindow(id: RhythmWindowID.about.rawValue)
         NSApp.activate(ignoringOtherApps: true)
     }
 

@@ -43,6 +43,7 @@ This README describes the behavior currently shipped in this fork. If you want t
   - `Desk break` stays non-blocking, keeps the Mac usable, can be shortened by 5 minutes from the menu, continues counting down in the menu, sends a final-5-minute warning for breaks longer than 5 minutes, and automatically returns to focus with a completion notification when possible
 - Local history: focus and rest sessions, planned durations, actual durations, and end reasons are stored in weekly JSON history under `Application Support/Rhythm/history/weeks/`; the Insights window keeps fixed-range charts, uses monthly aggregation for `All Time`, browses sessions one reporting day at a time, and exports `Today`, `Last 7 Days`, `Last 30 Days`, `All Time`, or the selected reporting day as CSV or JSON; app-off recovery state lives in `Application Support/Rhythm/state/app-lifecycle.json`
 - Menu bar app: stays in the status bar, keeps the icon visible, shows a live countdown for quick status checks and recent history, and prevents two Rhythm copies from running at the same time, including later duplicate launches from local builds
+- About and direct updates: the menu opens an `About Rhythm` window with version/build details, project links, and direct-update controls; local/ad-hoc builds show updates as unavailable, while signed direct-release builds can use Sparkle for update checks and install/relaunch prompts
 - Launch at login: can be enabled or disabled from the menu after the app is installed normally
 
 ## Tech Stack
@@ -50,6 +51,7 @@ This README describes the behavior currently shipped in this fork. If you want t
 - Swift 6
 - SwiftUI + AppKit
 - Swift Package Manager
+- Sparkle for signed direct-release updates
 
 ## Run Locally
 
@@ -76,6 +78,28 @@ This script is a local/direct-distribution helper. It uses an ad-hoc signature a
 
 System notification checks should use `dist/Rhythm.app`. Raw Xcode / `swift run` executables intentionally skip system notifications because they are not normal app bundles.
 
+## Direct Release Updates
+
+Sparkle is enabled only for signed direct-release builds. Normal local builds keep updates disabled so `swift run` and ad-hoc `dist/Rhythm.app` bundles do not show broken update prompts.
+
+For a production direct release, provide Developer ID and Sparkle metadata:
+
+```bash
+RHYTHM_RELEASE=1 \
+RHYTHM_SIGNING_IDENTITY="Developer ID Application: ..." \
+RHYTHM_SPARKLE_PUBLIC_ED_KEY="..." \
+./scripts/package_dmg.sh 0.2.0
+```
+
+This creates the install DMG and a Sparkle ZIP when release mode is enabled. After notarizing and uploading release assets to GitHub Releases, update `appcast.xml` with a release-specific download prefix:
+
+```bash
+RHYTHM_DOWNLOAD_URL_PREFIX=https://github.com/rray89/rhythm/releases/download/v0.2.0 \
+  ./scripts/update_appcast.sh dist
+```
+
+The default feed URL is `https://raw.githubusercontent.com/rray89/rhythm/main/appcast.xml`.
+
 ## TDD Regression Checks
 
 ```bash
@@ -89,6 +113,7 @@ This command runs repeatable regression coverage for:
 - focus and rest history, weekly folder migration, and daily totals
 - insights snapshots, hidden-rest history state, and fixed-range / selected-day CSV/JSON export
 - focus-ending-soon notifications
+- About/update release info formatting and bilingual update strings
 - skipped breaks and `Desk break` session recording
 - one-cycle next scheduled `Desk break` toggle, `Break Now` handoff, and no-rest override
 - hidden screen-lock rest and fresh focus after unlock
