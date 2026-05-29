@@ -3,6 +3,7 @@ import RhythmCore
 import SwiftUI
 
 struct MenuBarView: View {
+    @Environment(\.dismiss) private var dismissMenu
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var timerEngine: TimerEngine
     @ObservedObject var settingsStore: SettingsStore
@@ -10,6 +11,7 @@ struct MenuBarView: View {
     @ObservedObject var launchAtLoginManager: LaunchAtLoginManager
     let updater: UpdaterProviding
     @State private var updaterRevision = 0
+    @State private var hoveredUtilityMenuItem: UtilityMenuItem?
 
     private var strings: AppStrings {
         AppStrings(language: settingsStore.effectiveAppLanguage)
@@ -280,12 +282,13 @@ struct MenuBarView: View {
             }
 
             if updater.isUpdateReadyToInstall {
-                utilityMenuButton(title: strings.restartToUpdateButton) {
+                utilityMenuButton(title: strings.restartToUpdateButton, item: .restartToUpdate) {
+                    dismissMenu()
                     updater.installUpdate()
                 }
             }
 
-            utilityMenuButton(title: strings.quitRhythmButton, shortcut: "⌘Q") {
+            utilityMenuButton(title: strings.quitRhythmButton, shortcut: "⌘Q", item: .quit) {
                 NSApplication.shared.terminate(nil)
             }
         }
@@ -319,25 +322,41 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder
-    private func utilityMenuButton(title: String, shortcut: String? = nil, action: @escaping () -> Void) -> some View {
+    private func utilityMenuButton(
+        title: String,
+        shortcut: String? = nil,
+        item: UtilityMenuItem? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        let item = item ?? UtilityMenuItem(title)
+        let isHovered = hoveredUtilityMenuItem == item
+
         Button(action: action) {
             HStack(spacing: 12) {
                 Text(title)
                     .font(.system(size: 15.5, weight: .regular))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(isHovered ? .white : .primary)
 
                 Spacer(minLength: 12)
 
                 if let shortcut {
                     Text(shortcut)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(isHovered ? Color.white.opacity(0.82) : Color.secondary.opacity(0.52))
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+            .padding(.horizontal, 11)
+            .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(isHovered ? Color.accentColor : Color.clear)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            hoveredUtilityMenuItem = hovering ? item : nil
+        }
     }
 
     @ViewBuilder
@@ -509,13 +528,19 @@ struct MenuBarView: View {
     }
 
     private func openInsightsWindow() {
-        openWindow(id: RhythmWindowID.insights.rawValue)
-        NSApp.activate(ignoringOtherApps: true)
+        dismissMenu()
+        DispatchQueue.main.async {
+            openWindow(id: RhythmWindowID.insights.rawValue)
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 
     private func openAboutWindow() {
-        openWindow(id: RhythmWindowID.about.rawValue)
-        NSApp.activate(ignoringOtherApps: true)
+        dismissMenu()
+        DispatchQueue.main.async {
+            openWindow(id: RhythmWindowID.about.rawValue)
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 
     @ViewBuilder
@@ -535,6 +560,16 @@ struct MenuBarView: View {
     private func sectionHeading(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
+    }
+}
+
+private enum UtilityMenuItem: Hashable {
+    case restartToUpdate
+    case quit
+    case title(String)
+
+    init(_ title: String) {
+        self = .title(title)
     }
 }
 
