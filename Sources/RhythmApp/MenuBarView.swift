@@ -81,7 +81,7 @@ private struct MenuBarPanelContent: View {
             actionSection
         }
         .padding(14)
-        .frame(width: 392)
+        .frame(width: MenuBarPanelLayout.width)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onReceive(updater.objectWillChange) { _ in
             updaterRevision += 1
@@ -643,10 +643,15 @@ private struct MenuTodayBalanceBar: View {
 private struct MenuBarClosedPanelPlaceholder: View {
     var body: some View {
         Color.clear
-            .frame(width: 392, height: 1)
+            .frame(width: MenuBarPanelLayout.width, height: MenuBarPanelLayout.closedPlaceholderHeight)
             .fixedSize()
             .accessibilityHidden(true)
     }
+}
+
+private enum MenuBarPanelLayout {
+    static let width: CGFloat = 392
+    static let closedPlaceholderHeight: CGFloat = 724
 }
 
 private struct MenuPanelVisibilityReader: NSViewRepresentable {
@@ -673,6 +678,7 @@ private struct MenuPanelVisibilityReader: NSViewRepresentable {
         var onVisibilityChange: (Bool) -> Void
         private weak var window: NSWindow?
         private var lastPublishedVisibility: Bool?
+        private var hasPendingDeferredPublish = false
 
         init(onVisibilityChange: @escaping (Bool) -> Void) {
             self.onVisibilityChange = onVisibilityChange
@@ -684,7 +690,7 @@ private struct MenuPanelVisibilityReader: NSViewRepresentable {
 
         func attach(to newWindow: NSWindow?) {
             guard window !== newWindow else {
-                publishVisibilitySoon()
+                publishVisibilityDeferred()
                 return
             }
 
@@ -692,7 +698,7 @@ private struct MenuPanelVisibilityReader: NSViewRepresentable {
             window = newWindow
 
             guard let newWindow else {
-                publishVisibilitySoon()
+                publishVisibilityDeferred()
                 return
             }
 
@@ -716,22 +722,23 @@ private struct MenuPanelVisibilityReader: NSViewRepresentable {
                 )
             }
 
-            publishVisibilitySoon()
+            publishVisibilityDeferred()
         }
 
         private func removeObservers() {
             NotificationCenter.default.removeObserver(self)
             lastPublishedVisibility = nil
+            hasPendingDeferredPublish = false
         }
 
-        private func publishVisibilitySoon() {
-            publishVisibility()
-            NSObject.cancelPreviousPerformRequests(
-                withTarget: self,
-                selector: #selector(publishVisibilityFromRunLoop),
-                object: nil
-            )
-            perform(#selector(publishVisibilityFromRunLoop), with: nil, afterDelay: 0)
+        private func publishVisibilityDeferred() {
+            guard !hasPendingDeferredPublish else { return }
+
+            hasPendingDeferredPublish = true
+            Task { @MainActor in
+                hasPendingDeferredPublish = false
+                publishVisibility()
+            }
         }
 
         private func publishVisibility() {
@@ -743,14 +750,10 @@ private struct MenuPanelVisibilityReader: NSViewRepresentable {
         }
 
         @objc
-        private func publishVisibilityFromRunLoop() {
-            publishVisibility()
-        }
-
-        @objc
         private func windowVisibilityDidChange(_ notification: Notification) {
             _ = notification
-            publishVisibilitySoon()
+            publishVisibility()
+            publishVisibilityDeferred()
         }
     }
 
