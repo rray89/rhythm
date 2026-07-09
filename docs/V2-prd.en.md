@@ -267,6 +267,8 @@ Likely areas to inspect:
 
 First shipped fix: menu-only profiling traced high CPU to the hidden Insights SwiftUI window observing the one-second timer and repeatedly rebuilding history snapshots while no Rhythm windows were visible. Insights now reads the active phase through a non-observing snapshot provider and derives its render state from one history snapshot per render, so the closed menu-only state no longer drives chart/session/export recomputation every second.
 
+Second shipped fix: later battery profiling found the `.window` menu bar extra panel could stay alive off-screen after being closed and keep the full menu SwiftUI tree subscribed to the one-second timer, which could degenerate into continuous AppKit layout work. The closed menu panel now renders an inert placeholder and only inserts the live timer/session/settings menu content while the backing panel window is visible.
+
 Expected product outcome:
 
 - Rhythm should not appear as a high-energy app during normal idle use

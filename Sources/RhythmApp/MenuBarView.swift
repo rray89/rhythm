@@ -3,6 +3,39 @@ import RhythmCore
 import SwiftUI
 
 struct MenuBarView: View {
+    let timerEngine: TimerEngine
+    let settingsStore: SettingsStore
+    let sessionStore: SessionStore
+    let launchAtLoginManager: LaunchAtLoginManager
+    let updater: UpdaterProviding
+
+    @State private var visibilityState = MenuPanelVisibilityState()
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            MenuPanelVisibilityReader { isVisible in
+                visibilityState.update(windowIsVisible: isVisible)
+            }
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+
+            switch visibilityState.renderMode {
+            case .live:
+                MenuBarPanelContent(
+                    timerEngine: timerEngine,
+                    settingsStore: settingsStore,
+                    sessionStore: sessionStore,
+                    launchAtLoginManager: launchAtLoginManager,
+                    updater: updater
+                )
+            case .inert:
+                MenuBarClosedPanelPlaceholder()
+            }
+        }
+    }
+}
+
+private struct MenuBarPanelContent: View {
     @Environment(\.dismiss) private var dismissMenu
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var timerEngine: TimerEngine
@@ -604,5 +637,129 @@ private struct MenuTodayBalanceBar: View {
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .frame(height: 12)
+    }
+}
+
+private struct MenuBarClosedPanelPlaceholder: View {
+    var body: some View {
+        Color.clear
+            .frame(width: 392, height: 1)
+            .fixedSize()
+            .accessibilityHidden(true)
+    }
+}
+
+private struct MenuPanelVisibilityReader: NSViewRepresentable {
+    let onVisibilityChange: (Bool) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onVisibilityChange: onVisibilityChange)
+    }
+
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView()
+        view.coordinator = context.coordinator
+        return view
+    }
+
+    func updateNSView(_ nsView: TrackingView, context: Context) {
+        context.coordinator.onVisibilityChange = onVisibilityChange
+        nsView.coordinator = context.coordinator
+        context.coordinator.attach(to: nsView.window)
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var onVisibilityChange: (Bool) -> Void
+        private weak var window: NSWindow?
+        private var lastPublishedVisibility: Bool?
+
+        init(onVisibilityChange: @escaping (Bool) -> Void) {
+            self.onVisibilityChange = onVisibilityChange
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
+        }
+
+        func attach(to newWindow: NSWindow?) {
+            guard window !== newWindow else {
+                publishVisibilitySoon()
+                return
+            }
+
+            removeObservers()
+            window = newWindow
+
+            guard let newWindow else {
+                publishVisibilitySoon()
+                return
+            }
+
+            let names: [Notification.Name] = [
+                NSWindow.didBecomeKeyNotification,
+                NSWindow.didResignKeyNotification,
+                NSWindow.didBecomeMainNotification,
+                NSWindow.didResignMainNotification,
+                NSWindow.didChangeOcclusionStateNotification,
+                NSWindow.willCloseNotification,
+                NSWindow.didMiniaturizeNotification,
+                NSWindow.didDeminiaturizeNotification
+            ]
+
+            for name in names {
+                NotificationCenter.default.addObserver(
+                    self,
+                    selector: #selector(windowVisibilityDidChange(_:)),
+                    name: name,
+                    object: newWindow
+                )
+            }
+
+            publishVisibilitySoon()
+        }
+
+        private func removeObservers() {
+            NotificationCenter.default.removeObserver(self)
+            lastPublishedVisibility = nil
+        }
+
+        private func publishVisibilitySoon() {
+            publishVisibility()
+            NSObject.cancelPreviousPerformRequests(
+                withTarget: self,
+                selector: #selector(publishVisibilityFromRunLoop),
+                object: nil
+            )
+            perform(#selector(publishVisibilityFromRunLoop), with: nil, afterDelay: 0)
+        }
+
+        private func publishVisibility() {
+            let isVisible = window?.isVisible == true
+            guard lastPublishedVisibility != isVisible else { return }
+
+            lastPublishedVisibility = isVisible
+            onVisibilityChange(isVisible)
+        }
+
+        @objc
+        private func publishVisibilityFromRunLoop() {
+            publishVisibility()
+        }
+
+        @objc
+        private func windowVisibilityDidChange(_ notification: Notification) {
+            _ = notification
+            publishVisibilitySoon()
+        }
+    }
+
+    final class TrackingView: NSView {
+        weak var coordinator: Coordinator?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            coordinator?.attach(to: window)
+        }
     }
 }
