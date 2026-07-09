@@ -252,6 +252,17 @@ struct RhythmTDDRunner {
             return chinese.menuBarAccessibilityLabel(mode: .resting, remainingSeconds: 7_200, breakKind: .desk) == "Rhythm，桌前休息，剩余 2:00:00"
         }
 
+        failures += run("closed menu panel renders inert content until visible") {
+            var state = MenuPanelVisibilityState()
+            guard state.renderMode == .inert else { return false }
+
+            state.update(windowIsVisible: true)
+            guard state.renderMode == .live else { return false }
+
+            state.update(windowIsVisible: false)
+            return state.renderMode == .inert
+        }
+
         failures += run("user notifications require a bundled app runtime") {
             let appBundleURL = URL(fileURLWithPath: "/Applications/Rhythm.app")
             let debugExecutableURL = URL(fileURLWithPath: "/Users/rray/Library/Developer/Xcode/DerivedData/rhythm/Build/Products/Debug/Rhythm")

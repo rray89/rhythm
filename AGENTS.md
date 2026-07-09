@@ -4,3 +4,4 @@
 - For user-facing product behavior changes, keep both `docs/V2-prd.zh.md` and `docs/V2-prd.en.md` aligned.
 - Internal refactors with no product or workflow change do not need PRD updates unless they affect documented behavior.
 - When completing a feature and opening or updating a PR, generate a local app bundle with `SKIP_DMG=1 ./scripts/package_dmg.sh` and tell the user the app is available at `dist/Rhythm.app` so they can try it without opening Xcode.
+- After one or more feature/bug PRs are merged, generate a fresh local app bundle from the merged base branch with `SKIP_DMG=1 ./scripts/package_dmg.sh` and tell the user the merged app is available at `dist/Rhythm.app`.
